@@ -3,9 +3,9 @@ import torch as pt
 class BiasOnePolynomial(pt.nn.Module):
     def __init__(self, n, multiplicity=1):
         super().__init__()
-        self.bias = 1
+        self.bias = pt.tensor(1.0)
         self.multiplicity = multiplicity
-        self.coefs = pt.nn.Parameter(pt.zeros(n))
+        self.coefs = pt.nn.Parameter(pt.zeros(n)) if n > 0 else []
 
     def forward(self, x):
         result = self.bias
