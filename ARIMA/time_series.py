@@ -45,7 +45,7 @@ class ARIMA(pt.nn.Module):
         >>> input_from_output = arima(output, invert=True)
         >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 7)
     '''
-    def __init__(self, p, d, q, ps, ds, qs, s, drift, fix_i_tail, fix_o_tail):
+    def __init__(self, p, d, q, ps, ds, qs, s, drift=False, fix_i_tail=True, fix_o_tail=False):
         super().__init__()
         self.PD = PD(p, d)
         self.Q = BiasOnePolynomial(q)
@@ -64,7 +64,7 @@ class ARIMA(pt.nn.Module):
         self.i_grads, self.i_hesss = calc_grads_hesss(i_coefs, i_grad_params, i_grad_params[1:])
         self.i_coefs = pt.cat([i_coef[None] for i_coef in i_coefs]).detach().clone()
         
-        self.drift = pt.nn.Parameter(pt.zeros(1)) if drift else 0.0
+        self.drift = pt.nn.Parameter(pt.zeros(1)) if drift else pt.zeros(1)
         i_tail = pt.zeros(len(self.i_coefs) - 1)
         o_tail = pt.zeros(len(self.o_coefs) - 1)
         self.i_tail = i_tail if fix_i_tail else pt.nn.Parameter(i_tail)
