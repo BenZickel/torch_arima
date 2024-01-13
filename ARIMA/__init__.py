@@ -1,1 +1,1 @@
-from .time_series import ARIMA
+from .TimeSeries import ARIMA
