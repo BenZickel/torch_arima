@@ -41,8 +41,8 @@ class ARIMA(pt.nn.Module):
         >>> from torch import randn
         >>> arima = ARIMA(2, 1, 1, 3, 0, 0, 4, True, True, True)
         >>> input = randn(7)
-        >>> output = arima(input)
-        >>> input_from_output = arima(output, invert=True)
+        >>> output = arima.predict(input)
+        >>> input_from_output = arima(output)
         >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 7)
     '''
     def __init__(self, p, d, q, ps, ds, qs, s, drift=False, fix_i_tail=True, fix_o_tail=False):
@@ -70,7 +70,7 @@ class ARIMA(pt.nn.Module):
         self.i_tail = i_tail if fix_i_tail else pt.nn.Parameter(i_tail)
         self.o_tail = o_tail if fix_o_tail else pt.nn.Parameter(o_tail)
         
-    def forward(self, input, invert=False):
+    def transform(self, input, invert=False):
         # Calculate coefficients of observations
         o_params = [*self.PD.parameters()] + [*self.PDS.parameters()]
         o_coefs = self.o_coefs
@@ -105,6 +105,12 @@ class ARIMA(pt.nn.Module):
             x = x - (output[count:] * o_coefs[:-1]).sum(0)
             output = pt.cat([output, x])
         return output[-(count + 1):]
+    
+    def forward(self, observations):
+        return self.transform(observations, invert=True)
+    
+    def predict(self, innovations):
+        return self.transform(innovations, invert=False)
 
 if __name__ == "__main__":
     import doctest
