@@ -1,6 +1,7 @@
 import torch as pt
 from ARIMA.taylor import taylor
 from ARIMA.Polynomial import BiasOnePolynomial, PD
+from ARIMA.Transform import ARMATransform
 
 def calc_grads_hesss(coefs, grad_params, hess_params):
     grads = []
@@ -70,7 +71,7 @@ class ARIMA(pt.nn.Module):
         self.i_tail = i_tail if fix_i_tail else pt.nn.Parameter(i_tail)
         self.o_tail = o_tail if fix_o_tail else pt.nn.Parameter(o_tail)
         
-    def transform(self, input, invert=False):
+    def get_transform(self):
         # Calculate coefficients of observations
         o_params = [*self.PD.parameters()] + [*self.PDS.parameters()]
         o_coefs = self.o_coefs
@@ -87,30 +88,13 @@ class ARIMA(pt.nn.Module):
         for i_hess, i_left, i_right in zip(self.i_hesss, i_params, i_params[1:]):
             i_coefs = i_coefs + pt.matmul(pt.matmul(i_left, i_hess), i_right)
 
-        # Calculate output
-        if invert:
-            output = self.i_tail
-            tail = self.o_tail
-            bias = -self.drift
-            i_coefs, o_coefs = o_coefs, i_coefs
-        else:
-            output = self.o_tail
-            tail = self.i_tail
-            bias = self.drift
-
-        input = pt.cat([tail, input])
-        for count in range(len(input) - len(tail)):
-            x = bias
-            x = x + (input[count:(count + len(tail) + 1)] * i_coefs).sum(0)
-            x = x - (output[count:] * o_coefs[:-1]).sum(0)
-            output = pt.cat([output, x])
-        return output[-(count + 1):]
+        return ARMATransform(self.i_tail, self.o_tail, i_coefs, o_coefs, self.drift)
     
     def forward(self, observations):
-        return self.transform(observations, invert=True)
+        return self.get_transform().inv(observations)
     
     def predict(self, innovations):
-        return self.transform(innovations, invert=False)
+        return self.get_transform()(innovations)
 
 if __name__ == "__main__":
     import doctest
