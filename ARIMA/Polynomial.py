@@ -5,16 +5,20 @@ class BiasOnePolynomial(pt.nn.Module):
         super().__init__()
         self.bias = pt.tensor(1.0)
         self.multiplicity = multiplicity
-        self.coefs = pt.nn.Parameter(pt.zeros(n)) if n > 0 else []
+        self.coefs = pt.nn.Parameter(pt.zeros(n)) if n > 0 else None
 
     def forward(self, x):
         result = self.bias
-        for n, coef in enumerate(self.coefs):
-            result = result + coef * x ** ((n+1) * self.multiplicity)
+        if self.coefs is not None:
+            for n, coef in enumerate(self.coefs):
+                result = result + coef * x ** ((n+1) * self.multiplicity)
         return result
 
     def degree(self):
-        return len(self.coefs) * self.multiplicity
+        return len(self.coefs) * self.multiplicity if self.coefs is not None else 0
+
+    def get_coefs(self):
+        return [self.coefs] if self.coefs is not None else []
 
 class IntegratorPolynomial(pt.nn.Module):
     def __init__(self, n, multiplicity=1):

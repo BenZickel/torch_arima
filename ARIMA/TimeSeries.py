@@ -55,13 +55,13 @@ class ARIMA(pt.nn.Module):
         
         # Calculate coefficients factors of observables
         o_coefs = taylor(lambda x: self.PD(x) * self.PDS(x), self.PD.degree() + self.PDS.degree() + 1)[::-1]
-        o_grad_params = [*self.PD.parameters()] + [*self.PDS.parameters()]
+        o_grad_params = self.PD.P.get_coefs() + self.PDS.P.get_coefs()
         self.o_grads, self.o_hesss = calc_grads_hesss(o_coefs, o_grad_params, o_grad_params[1:])
         self.o_coefs = pt.cat([o_coef[None] for o_coef in o_coefs]).detach().clone()
         
         # Calculate coefficients factors of innovations
         i_coefs = taylor(lambda x: self.Q(x) * self.QS(x), self.Q.degree() + self.QS.degree() + 1)[::-1]
-        i_grad_params = [*self.Q.parameters()] + [*self.QS.parameters()]
+        i_grad_params = self.Q.get_coefs() + self.QS.get_coefs()
         self.i_grads, self.i_hesss = calc_grads_hesss(i_coefs, i_grad_params, i_grad_params[1:])
         self.i_coefs = pt.cat([i_coef[None] for i_coef in i_coefs]).detach().clone()
         
@@ -71,9 +71,9 @@ class ARIMA(pt.nn.Module):
         self.i_tail = i_tail if fix_i_tail else pt.nn.Parameter(i_tail)
         self.o_tail = o_tail if fix_o_tail else pt.nn.Parameter(o_tail)
         
-    def get_transform(self):
+    def get_transform(self, *args, **kwargs):
         # Calculate coefficients of observations
-        o_params = [*self.PD.parameters()] + [*self.PDS.parameters()]
+        o_params = self.PD.P.get_coefs() + self.PDS.P.get_coefs()
         o_coefs = self.o_coefs
         for o_grad, o_param in zip(self.o_grads, o_params):
             o_coefs = o_coefs + pt.matmul(o_grad, o_param)
@@ -81,14 +81,14 @@ class ARIMA(pt.nn.Module):
             o_coefs = o_coefs + pt.matmul(pt.matmul(o_left, o_hess), o_right)
 
         # Calculate coefficients of innovations
-        i_params = [*self.Q.parameters()] + [*self.QS.parameters()]
+        i_params = self.Q.get_coefs() + self.QS.get_coefs()
         i_coefs = self.i_coefs
         for i_grad, i_param in zip(self.i_grads, i_params):
             i_coefs = i_coefs + pt.matmul(i_grad, i_param)
         for i_hess, i_left, i_right in zip(self.i_hesss, i_params, i_params[1:]):
             i_coefs = i_coefs + pt.matmul(pt.matmul(i_left, i_hess), i_right)
 
-        return ARMATransform(self.i_tail, self.o_tail, i_coefs, o_coefs, self.drift)
+        return ARMATransform(self.i_tail, self.o_tail, i_coefs, o_coefs, self.drift, *args, **kwargs)
     
     def forward(self, observations):
         return self.get_transform().inv(observations)
