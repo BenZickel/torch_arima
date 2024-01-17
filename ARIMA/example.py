@@ -94,7 +94,7 @@ if __name__ == "__main__":
     print('Saved output file ' + output_file_name)
 
     #########################################################
-    # Show effect of amount of training data of predictions #
+    # Show effect of amount of training data on predictions #
     #########################################################
     ratios = [1,1/2,1/4,1/8]
     models = []

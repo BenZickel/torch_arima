@@ -12,7 +12,7 @@ import pyro
 import os
 from pyro.infer import Predictive
 from ARIMA import BayesianARIMA
-from ARIMA.example import load_data, calc_percentiles
+from ARIMA.example import load_data, calc_percentiles, plot
 
 def create_model(obs_idx, num_predictions):
     # Create model with non-overlapping observed and predicted sample indices.
@@ -37,6 +37,9 @@ def fit(model, observations,
     return guide
 
 if __name__ == "__main__":
+    ##########################################
+    # Fit model to data and show predictions #
+    ##########################################
     year, observations = load_data()
 
     num_predictions = 5 * 12
@@ -77,5 +80,59 @@ if __name__ == "__main__":
     os.makedirs(plots_dir, exist_ok=True)
 
     output_file_name = plots_dir + '/bayesian_example.png'
+    plt.savefig(output_file_name)
+    print('Saved output file ' + output_file_name)
+
+    #########################################################
+    # Show effect of amount of training data on predictions #
+    #########################################################
+    ratios = [1,1/2,1/4,1/8][::-1]
+    models = []
+    indices = []
+    guides = []
+    samples = []
+    for ratio in ratios:
+        n = len(observations)
+        indices.append(range(round((1 - ratio)*n), n))
+        models.append(create_model([*range(len([*indices[-1]]))], num_predictions))
+        guides.append(fit(models[-1], observations[indices[-1]]))
+        samples.append(Predictive(models[-1],
+                                  guide=guides[-1],
+                                  num_samples=num_samples,
+                                  return_sites=("_RETURN",))()['_RETURN'])
+
+    plt.figure()
+    colors = ['r', 'g', 'b', 'y'][::-1]
+    cis = []
+    one_year_mean_ci = []
+    five_year_mean_ci = []
+    for ratio, idx, sample, color in zip(ratios, indices, samples, colors):
+        cis.append(calc_percentiles(sample, [0.05, 0.95]))
+        plot(year[idx], cis[-1], observations[idx],
+             samples_label='Bayesian Estimator at {}% of data at 90% CI'.format(100 * ratio), samples_color=color)
+        ci = cis[-1][:,-num_predictions:]
+        one_year_mean_ci.append((ci[1]-ci[0])[:12].mean())
+        five_year_mean_ci.append((ci[1]-ci[0]).mean())
+
+    plt.xlabel('Year')
+    plt.ylabel('Value')
+    plt.title('Bayesian Predictions at Various Ratios of Observed Data')
+    plt.legend(loc='lower left')
+    plt.grid()
+
+    output_file_name = plots_dir + '/bayesian_example_ratio.png'
+    plt.savefig(output_file_name)
+    print('Saved output file ' + output_file_name)
+
+    plt.figure()
+    plt.plot(ratios, one_year_mean_ci, 'bo-', label='One Year Mean 90% CI')
+    plt.plot(ratios, five_year_mean_ci, 'ro-', label='Five Year Mean 90% CI')
+    plt.xlabel('Ratio of Observed Data')
+    plt.ylabel('Mean 90% CI')
+    plt.title('Bayesian Estimator 90% CI vs Ratio of Observed Data')
+    plt.legend(loc='upper right')
+    plt.grid()
+
+    output_file_name = plots_dir + '/bayesian_example_ratio_ci.png'
     plt.savefig(output_file_name)
     print('Saved output file ' + output_file_name)
