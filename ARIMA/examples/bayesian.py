@@ -12,7 +12,7 @@ import pyro
 import os
 from pyro.infer import Predictive
 from ARIMA import BayesianARIMA
-from ARIMA.example import load_data, calc_percentiles, plot
+from ARIMA.examples.utils import load_data, calc_percentiles, plot
 
 def create_model(obs_idx, num_predictions):
     # Create model with non-overlapping observed and predicted sample indices.

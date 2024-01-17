@@ -5,18 +5,12 @@ Based on https://otexts.com/fpp2/seasonal-arima.html#example-corticosteroid-drug
 
 Raw data downloaded from https://www.key2stats.com/data-set/view/764.
 '''
-import pandas as pd
 import matplotlib.pyplot as plt
 import torch as pt
 import numpy as np
 import os
 from ARIMA import ARIMA
-
-def load_data():
-    data = pd.read_csv(os.path.dirname(__file__) + '/data/Monthly_corticosteroid_drug_sales_in_Australia_from_July_1991_to_June_2008.csv')
-    year = data['time'].to_numpy()
-    observations = pt.Tensor(data['value'])
-    return year, observations
+from ARIMA.examples.utils import load_data, calc_percentiles, plot
 
 def fit(model, observations,
         lr_sequence=[(0.005, 100),
@@ -46,22 +40,6 @@ def predict(model, innovations, num_samples, num_predictions):
         samples.append(all_observations)
     return np.array(samples)
 
-def plot(time, samples, observations,
-         samples_label=None, observations_label=None,
-         samples_color='r', observations_color='b'):
-    if observations_label is not None:
-        plt.plot(time, observations, color=observations_color, label='Observations')
-    all_time = np.concatenate((time, time[-1] + (np.arange(samples.shape[1] - len(time)) + 1) * np.diff(time).mean()))
-    idx = range(len(observations) - 1, len(all_time))
-    if samples_label is not None:
-        plt.fill_between(all_time[idx], samples[0, idx], samples[1, idx], color=samples_color, alpha=0.5,
-                         label=samples_label)
-
-def calc_percentiles(samples, percentiles):
-    samples = np.sort(samples, axis=0)
-    indices = [int(np.floor(p * samples.shape[0])) for p in percentiles]
-    return samples[indices]
-
 if __name__ == "__main__":
     ##########################################
     # Fit model to data and show predictions #
@@ -89,7 +67,7 @@ if __name__ == "__main__":
     plots_dir = os.path.dirname(__file__) + '/plots'
     os.makedirs(plots_dir, exist_ok=True)
 
-    output_file_name = plots_dir + '/example.png'
+    output_file_name = plots_dir + '/mle_example.png'
     plt.savefig(output_file_name)
     print('Saved output file ' + output_file_name)
 
@@ -127,7 +105,7 @@ if __name__ == "__main__":
     plt.legend(loc='lower left')
     plt.grid()
 
-    output_file_name = plots_dir + '/example_ratio.png'
+    output_file_name = plots_dir + '/mle_example_ratio.png'
     plt.savefig(output_file_name)
     print('Saved output file ' + output_file_name)
 
@@ -140,6 +118,6 @@ if __name__ == "__main__":
     plt.legend(loc='upper left')
     plt.grid()
 
-    output_file_name = plots_dir + '/example_ratio_ci.png'
+    output_file_name = plots_dir + '/mle_example_ratio_ci.png'
     plt.savefig(output_file_name)
     print('Saved output file ' + output_file_name)

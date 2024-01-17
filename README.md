@@ -7,13 +7,13 @@ ARIMA time series implementation in PyTorch implemented as a torch `torch.nn.Mod
 ### Maximum Likelihood Estimator
 
 ```
-python -m ARIMA.example
+python -m ARIMA.examples.mle
 ```
 
 ### Bayesian Estimator
 
 ```
-python -m ARIMA.bayesian_example
+python -m ARIMA.examples.bayesian
 ```
 
 ## Tests
