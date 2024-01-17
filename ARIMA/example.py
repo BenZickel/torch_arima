@@ -18,9 +18,9 @@ def load_data():
     observations = pt.Tensor(data['value'])
     return year, observations
 
-def fit(model, observations, num_iterations=1000,
+def fit(model, observations,
         lr_sequence=[(0.005, 100),
-                     (0.010, 100)] * 5 + \
+                     (0.010, 100)] * 5 +
                     [(0.005, 100),
                      (0.001, 500)]):
     # Optimize model parameters in order find the Maximum Likelihood Estimator (MLE).
