@@ -10,7 +10,7 @@ import torch as pt
 import numpy as np
 import os
 from ARIMA import ARIMA
-from ARIMA.examples.utils import load_data, calc_percentiles, plot
+from ARIMA.examples.utils import load_data, calc_percentiles
 
 def fit(model, observations,
         lr_sequence=[(0.005, 100),
@@ -38,7 +38,7 @@ def predict(model, innovations, num_samples, num_predictions):
         all_innovations = pt.cat([innovations, new_innovations])
         all_observations = model.predict(all_innovations).detach().numpy()
         samples.append(all_observations)
-    return np.array(samples)
+    return np.array(samples)[...,len(innovations):]
 
 if __name__ == "__main__":
     ##########################################
@@ -54,10 +54,21 @@ if __name__ == "__main__":
     num_predictions = 5 * 12
     samples = predict(model, fit_result['innovations'], num_samples, num_predictions)
 
+    confidence_interval = [0.05, 0.95]
+
     plt.figure()
-    plot(year, calc_percentiles(samples, [0.05, 0.95]), observations,
-         observations_label='Observations',
-         samples_label='Maximum Likelihood Estimates (MLE) at 90% CI')
+
+    # Plot observations
+    plt.plot(year, observations, color='b', label='Observations')
+
+    # Plot confidence interval of predictions
+    samples_year = max(year) + (np.arange(num_predictions) + 1) * np.diff(year).mean()
+    ci = calc_percentiles(samples, confidence_interval)
+    plt.fill_between([year[-1]] + list(samples_year),
+                     [observations[-1]] + list(ci[0]),
+                     [observations[-1]] + list(ci[1]),
+                     label='Maximum Likelihood Estimates (MLE) at 90% CI', alpha=0.5, color='r')
+    
     plt.title('Monthly corticosteroid drug sales in Australia')
     plt.xlabel('Year')
     plt.ylabel('Value')
@@ -92,12 +103,11 @@ if __name__ == "__main__":
     one_year_mean_ci = []
     five_year_mean_ci = []
     for ratio, idx, sample, color in zip(ratios, indices, samples, colors):
-        cis.append(calc_percentiles(sample, [0.05, 0.95]))
-        plot(year[idx], cis[-1], observations[idx],
-             samples_label='MLE {}% of data at 90% CI'.format(100 * ratio), samples_color=color)
-        ci = cis[-1][:,-num_predictions:]
-        one_year_mean_ci.append((ci[1]-ci[0])[:12].mean())
-        five_year_mean_ci.append((ci[1]-ci[0]).mean())
+        cis.append(calc_percentiles(sample, confidence_interval))
+        plt.fill_between(samples_year, cis[-1][0], cis[-1][1],
+                         label='MLE {}% of data at 90% CI'.format(100 * ratio), color=color, alpha=0.5)
+        one_year_mean_ci.append((cis[-1][1]-cis[-1][0])[:12].mean())
+        five_year_mean_ci.append((cis[-1][1]-cis[-1][0]).mean())
 
     plt.xlabel('Year')
     plt.ylabel('Value')
