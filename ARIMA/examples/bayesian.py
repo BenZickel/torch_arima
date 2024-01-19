@@ -24,14 +24,16 @@ def fit(model, observations,
         lr_sequence=[(0.005, 100),
                      (0.010, 100)] * 5 +
                     [(0.005, 100),
-                     (0.001, 100)]):
+                     (0.001, 100)],
+        loss=pyro.infer.Trace_ELBO,
+        loss_params=dict(num_particles=20, vectorize_particles=True)):
     # Create posterior for Bayesian model
     guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
     guide(observations)
     guide.loc.data[:] = 0
     for lr, num_iter in lr_sequence:
         optimizer = pyro.optim.Adam(dict(lr=lr))
-        svi = pyro.infer.SVI(model, guide, optimizer, loss=pyro.infer.Trace_ELBO(num_particles=5))
+        svi = pyro.infer.SVI(model, guide, optimizer, loss=loss(**loss_params))
         for count in range(num_iter):
             svi.step(observations)
     return guide

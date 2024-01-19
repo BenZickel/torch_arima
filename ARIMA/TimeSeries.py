@@ -76,17 +76,17 @@ class ARIMA(pt.nn.Module):
         o_params = self.PD.P.get_coefs() + self.PDS.P.get_coefs()
         o_coefs = self.o_coefs
         for o_grad, o_param in zip(self.o_grads, o_params):
-            o_coefs = o_coefs + pt.matmul(o_grad, o_param)
+            o_coefs = o_coefs + pt.matmul(o_grad, o_param[...,None])[...,0]
         for o_hess, o_left, o_right in zip(self.o_hesss, o_params, o_params[1:]):
-            o_coefs = o_coefs + pt.matmul(pt.matmul(o_left, o_hess), o_right)
+            o_coefs = o_coefs + pt.matmul(pt.matmul(o_left[..., None, None, :], o_hess), o_right[..., None, :, None])[..., 0, 0]
 
         # Calculate coefficients of innovations
         i_params = self.Q.get_coefs() + self.QS.get_coefs()
         i_coefs = self.i_coefs
         for i_grad, i_param in zip(self.i_grads, i_params):
-            i_coefs = i_coefs + pt.matmul(i_grad, i_param)
+            i_coefs = i_coefs + pt.matmul(i_grad, i_param[..., None])[...,0]
         for i_hess, i_left, i_right in zip(self.i_hesss, i_params, i_params[1:]):
-            i_coefs = i_coefs + pt.matmul(pt.matmul(i_left, i_hess), i_right)
+            i_coefs = i_coefs + pt.matmul(pt.matmul(i_left[..., None, None, :], i_hess), i_right[..., None, :, None])[..., 0, 0]
 
         return ARMATransform(self.i_tail, self.o_tail, i_coefs, o_coefs, self.drift, *args, **kwargs)
     
