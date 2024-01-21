@@ -10,7 +10,8 @@ import torch as pt
 import numpy as np
 import os
 from ARIMA import ARIMA
-from ARIMA.examples.utils import load_data, calc_percentiles
+from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir
+from ARIMA.examples import __name__ as __examples__name__
 
 def fit(model, observations,
         lr_sequence=[(0.005, 100),
@@ -40,7 +41,7 @@ def predict(model, innovations, num_samples, num_predictions):
         samples.append(all_observations)
     return np.array(samples)[...,len(innovations):]
 
-if __name__ == "__main__":
+if __name__ == "__main__" or __examples__name__ == "__main__":
     ##########################################
     # Fit model to data and show predictions #
     ##########################################
@@ -74,9 +75,6 @@ if __name__ == "__main__":
     plt.ylabel('Value')
     plt.legend(loc='upper left')
     plt.grid()
-    
-    plots_dir = os.path.dirname(__file__) + '/plots'
-    os.makedirs(plots_dir, exist_ok=True)
 
     output_file_name = plots_dir + '/mle_example.png'
     plt.savefig(output_file_name)
@@ -98,36 +96,37 @@ if __name__ == "__main__":
         samples.append(predict(models[-1], fit_results[-1]['innovations'], num_samples, num_predictions))
 
     plt.figure()
+    spans = np.array(ratios) * (max(year) - min(year))
     colors = ['r', 'g', 'b', 'y']
     cis = []
     one_year_mean_ci = []
     five_year_mean_ci = []
-    for ratio, idx, sample, color in zip(ratios, indices, samples, colors):
+    for span, idx, sample, color in zip(spans, indices, samples, colors):
         cis.append(calc_percentiles(sample, confidence_interval))
         plt.fill_between(samples_year, cis[-1][0], cis[-1][1],
-                         label='MLE {}% of data at 90% CI'.format(100 * ratio), color=color, alpha=0.5)
+                         label='MLE Estimator at {:.1f} Years Observed Data Span at 90% CI'.format(span), color=color, alpha=0.5)
         one_year_mean_ci.append((cis[-1][1]-cis[-1][0])[:12].mean())
         five_year_mean_ci.append((cis[-1][1]-cis[-1][0]).mean())
 
     plt.xlabel('Year')
     plt.ylabel('Value')
-    plt.title('MLE Predictions at Various Ratios of Observed Data')
+    plt.title('MLE Predictions at Various Observed Data Spans')
     plt.legend(loc='lower left')
     plt.grid()
 
-    output_file_name = plots_dir + '/mle_example_ratio.png'
+    output_file_name = plots_dir + '/mle_example_span.png'
     plt.savefig(output_file_name)
     print('Saved output file ' + output_file_name)
 
     plt.figure()
-    plt.plot(ratios, one_year_mean_ci, 'bo-', label='One Year Mean 90% CI')
-    plt.plot(ratios, five_year_mean_ci, 'ro-', label='Five Year Mean 90% CI')
-    plt.xlabel('Ratio of Observed Data')
+    plt.plot(spans, one_year_mean_ci, 'bo-', label='One Year Mean 90% CI')
+    plt.plot(spans, five_year_mean_ci, 'ro-', label='Five Year Mean 90% CI')
+    plt.xlabel('Observed Data Span [Years]')
     plt.ylabel('Mean 90% CI')
-    plt.title('MLE Mean 90% CI vs Ratio of Observed Data')
+    plt.title('MLE Mean 90% CI vs Observed Data Span')
     plt.legend(loc='upper left')
     plt.grid()
 
-    output_file_name = plots_dir + '/mle_example_ratio_ci.png'
+    output_file_name = plots_dir + '/mle_example_span_ci.png'
     plt.savefig(output_file_name)
     print('Saved output file ' + output_file_name)
