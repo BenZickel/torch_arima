@@ -20,7 +20,14 @@ def calc_grads_hesss(coefs, grad_params, hess_params):
     hesss = [pt.stack([pt.stack(h) for h in hess]).detach().clone() for hess in hesss]
     return grads, hesss
 
-class ARIMA(pt.nn.Module):
+class Transform():
+    def forward(self, observations):
+        return self.get_transform().inv(observations)
+    
+    def predict(self, innovations):
+        return self.get_transform()(innovations)
+
+class ARIMA(Transform, pt.nn.Module):
     '''
     ARIMA time series implementation in PyTorch.
 
@@ -89,12 +96,30 @@ class ARIMA(pt.nn.Module):
             i_coefs = i_coefs + pt.matmul(pt.matmul(i_left[..., None, None, :], i_hess), i_right[..., None, :, None])[..., 0, 0]
 
         return ARMATransform(self.i_tail, self.o_tail, i_coefs, o_coefs, self.drift, *args, **kwargs)
-    
-    def forward(self, observations):
-        return self.get_transform().inv(observations)
-    
-    def predict(self, innovations):
-        return self.get_transform()(innovations)
+
+class VARIMA(Transform, pt.nn.Module):
+    '''
+    Vector ARIMA time series implementation in PyTorch.
+
+    Args:
+        arimas: List of ARIMA transforms.
+
+    Examples:
+        >>> from ARIMA import ARIMA, VARIMA
+        >>> from numpy.testing import assert_array_almost_equal
+        >>> from torch import randn
+        >>> varima = VARIMA([ARIMA(2, 1, 1, 3, 0, 0, 4, True, True, True) for count in range(5)])
+        >>> input = randn(7, 5)
+        >>> output = varima.predict(input)
+        >>> input_from_output = varima(output)
+        >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 7)
+    '''
+    def __init__(self, arimas):
+        super().__init__()
+        self.arimas = pt.nn.ModuleList(arimas)
+        
+    def get_transform(self, *args, **kwargs):
+        return pt.distributions.transforms.CatTransform([arima.get_transform() for arima in self.arimas], dim=-1)
 
 if __name__ == "__main__":
     import doctest

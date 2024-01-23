@@ -1,2 +1,2 @@
-from .TimeSeries import ARIMA
+from .TimeSeries import ARIMA, VARIMA
 from .BayesianTimeSeries import BayesianARIMA
