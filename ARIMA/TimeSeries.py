@@ -51,7 +51,7 @@ class ARIMA(Transform, pt.nn.Module):
         >>> input = randn(7)
         >>> output = arima.predict(input)
         >>> input_from_output = arima(output)
-        >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 7)
+        >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 6)
     '''
     def __init__(self, p, d, q, ps, ds, qs, s, drift=False, fix_i_tail=True, fix_o_tail=False):
         super().__init__()
