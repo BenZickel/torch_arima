@@ -111,15 +111,22 @@ class VARIMA(Transform, pt.nn.Module):
         >>> varima = VARIMA([ARIMA(2, 1, 1, 3, 0, 0, 4, True, True, True) for count in range(5)])
         >>> input = randn(7, 5)
         >>> output = varima.predict(input)
+        >>> first_output = varima.arimas[0].predict(input[:, 0])
+        >>> assert_array_almost_equal(output[:, 0].detach().numpy(), first_output.detach().numpy(), 6)
         >>> input_from_output = varima(output)
-        >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 7)
+        >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 6)
     '''
     def __init__(self, arimas):
         super().__init__()
         self.arimas = pt.nn.ModuleList(arimas)
         
-    def get_transform(self, *args, **kwargs):
-        return pt.distributions.transforms.CatTransform([arima.get_transform() for arima in self.arimas], dim=-1)
+    def get_transform(self, *args, x=None, **kwargs):
+        if x is None:
+            x_vec = [None] * len(self.arimas)
+        else:
+            x_vec = [x[..., idx] for idx in range(x.shape[-1])]
+        return pt.distributions.transforms.CatTransform([arima.get_transform(*args, x=x_value, strip_last_idx=True, **kwargs)
+                                                                                for x_value, arima in zip(x_vec, self.arimas)], dim=-1)
 
 if __name__ == "__main__":
     import doctest

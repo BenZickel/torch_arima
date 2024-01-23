@@ -32,15 +32,16 @@ class ARMATransform(pt.distributions.transforms.Transform):
     domain = pt.distributions.constraints.real
     codomain = pt.distributions.constraints.real
 
-    def __init__(self, i_tail, o_tail, i_coefs, o_coefs, drift, x=None, idx=None, x_is_in_not_out=None):
+    def __init__(self, i_tail, o_tail, i_coefs, o_coefs, drift, x=None, idx=None, x_is_in_not_out=None, strip_last_idx=False):
         super().__init__()
         self.i_tail, self.o_tail, self.i_coefs, self.o_coefs, self.drift = i_tail, o_tail, i_coefs, o_coefs, drift
-        self.x, self.idx, self.x_is_in_not_out = x, idx, x_is_in_not_out
+        self.x, self.idx, self.x_is_in_not_out, self.strip_last_idx = x, idx, x_is_in_not_out, strip_last_idx
 
     def log_abs_det_jacobian(self, x, y):
         return x.new_zeros(x.shape[:-1])
 
     def _call(self, x):
+        if self.strip_last_idx: x=x[..., 0]
         x_is_in_not_out = pt.tensor([True] * (x if self.x is None else self.x).shape[-1]) if self.x_is_in_not_out is None else self.x_is_in_not_out.clone()
         if self.x is not None:
             x_clone = self.x.clone()
@@ -49,9 +50,10 @@ class ARMATransform(pt.distributions.transforms.Transform):
         x = calc_arma_transform(x, x_is_in_not_out, self.i_tail, self.o_tail, self.i_coefs, self.o_coefs, self.drift)
         if self.x is not None:
             x = x[..., self.idx]
-        return x
+        return x if not self.strip_last_idx else x[..., None]
 
     def _inverse(self, x):
+        if self.strip_last_idx: x=x[..., 0]
         x_is_in_not_out = pt.tensor([False] * (x if self.x is None else self.x).shape[-1]) if self.x_is_in_not_out is None else ~self.x_is_in_not_out.clone()
         if self.x is not None:
             x_clone = self.x.clone()
@@ -62,4 +64,4 @@ class ARMATransform(pt.distributions.transforms.Transform):
         x = calc_arma_transform(x, x_is_in_not_out, self.i_tail, self.o_tail, self.i_coefs, self.o_coefs, self.drift)
         if self.x is not None:
             x = x[..., self.idx]
-        return x
+        return x if not self.strip_last_idx else x[..., None]
