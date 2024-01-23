@@ -13,6 +13,18 @@ def BayesianARIMA(*args, obs_idx, predict_idx, innovations=NormalInnovations, **
     return BayesianTimeSeries(ARIMA(*args, **kwargs), innovations(), obs_idx, predict_idx)
 
 def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNormalInnovations, **kwargs):
+    '''
+    Examples:
+        >>> from ARIMA import BayesianVARIMA
+        >>> import torch as pt
+        >>> import pyro
+        >>> obs_idx = [*range(10)]
+        >>> predict_idx = [*range(10,17)]
+        >>> n = 5
+        >>> model = BayesianVARIMA(3, 0, 1, 0, 1, 2, 12, n=n, obs_idx=obs_idx, predict_idx=predict_idx)
+        >>> with pyro.poutine.trace(): model(pt.zeros(len(obs_idx), n))
+        >>> ret_val = model()
+    '''
     return BayesianTimeSeries(VARIMA([ARIMA(*args, **kwargs) for i in range(n)]), innovations(n), obs_idx, predict_idx)
 
 class BayesianTimeSeries(pyro.nn.PyroModule):
@@ -32,7 +44,7 @@ class BayesianTimeSeries(pyro.nn.PyroModule):
 
     def innovations(self):
         # Build innovations vector
-        innovations = pt.zeros(self.innovations_dist.shape(len(self.obs_idx) + len(self.predict_idx), list(self.predict_innovations.shape)))
+        innovations = pt.zeros(self.innovations_dist.shape(len(self.obs_idx) + len(self.predict_idx)))
         innovations[self.innovations_dist.slice(self.predict_idx)] = self.predict_innovations
         is_innovation = pt.zeros(len(self.obs_idx) + len(self.predict_idx)).bool()
         is_innovation[self.predict_idx] = True
@@ -54,3 +66,7 @@ class BayesianTimeSeries(pyro.nn.PyroModule):
             transform = self.model.get_transform(x=combined, idx=self.predict_idx, x_is_in_not_out=is_innovation)
             combined[self.innovations_dist.slice(self.predict_idx)] = transform(combined[self.innovations_dist.slice(self.predict_idx)])
             return combined
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()

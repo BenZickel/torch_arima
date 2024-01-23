@@ -8,15 +8,11 @@ class NormalInnovations(PyroModule):
         self.sigma_prior = sigma_prior_dist(**sigma_prior_dist_params)
         self.sigma = PyroSample(self.sigma_prior)
 
-    def shape(self, num_event_samples, shape=None):
-        if shape is None: shape = list(self.sigma.shape) if len(self.sigma.shape) > 0 else [1]
-        shape[min(-len(self.sigma_prior.event_shape), -1)] = num_event_samples
-        return tuple(shape)
+    def shape(self, num_event_samples):
+        return self.sigma.shape + (num_event_samples,)
 
     def slice(self, event_samples_idx):
-        indices = [Ellipsis] + [slice(None)] * max(1, len(self.sigma.shape))
-        indices[min(-len(self.sigma_prior.event_shape), -1)] = event_samples_idx
-        return indices
+        return (Ellipsis, event_samples_idx)
 
     def forward(self, num_samples):
         return Normal(                    pt.zeros(self.sigma.shape + (num_samples,)),
@@ -28,15 +24,11 @@ class MultivariateNormalInnovations(PyroModule):
         self.sqrt_cov_prior = sqrt_cov_prior_dist(**sqrt_cov_prior_dist_params).expand((n, n)).to_event(2)
         self.sqrt_cov = PyroSample(self.sqrt_cov_prior)
 
-    def shape(self, num_event_samples, shape=None):
-        if shape is None: shape = list(self.sqrt_cov.shape)
-        shape[-len(self.sqrt_cov_prior.event_shape)] = num_event_samples
-        return tuple(shape)
+    def shape(self, num_event_samples):
+        return self.sqrt_cov.shape[:-2] + (num_event_samples, self.sqrt_cov.shape[-1])
 
     def slice(self, event_samples_idx):
-        indices = [Ellipsis] + [slice(None)] * len(self.sqrt_cov.shape)
-        indices[-len(self.sqrt_cov_prior.event_shape)] = event_samples_idx
-        return indices
+        return (Ellipsis, event_samples_idx, slice(None))
 
     def forward(self, num_samples):
         cov = pt.matmul(self.sqrt_cov, pt.swapaxes(self.sqrt_cov, -1, -2))
