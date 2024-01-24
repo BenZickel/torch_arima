@@ -24,3 +24,26 @@ plt.grid()
 output_file_name = plots_dir + '/compare_example_span_ci.png'
 plt.savefig(output_file_name)
 print('Saved output file ' + output_file_name)
+
+plt.figure()
+colors = ['r', 'g', 'b', 'y']
+for name, plot_spec, example in [('MLE', 'o-', ARIMA.examples.mle),
+                                 ('Bayesian', 'x-', ARIMA.examples.bayesian)]:
+    spans = np.array(example.ratios) * (max(example.year) - min(example.year))
+    for plot_num, (span, median, color) in enumerate(zip(spans, example.median, colors)):
+        plt.subplot(2, 2, plot_num + 1)
+        end_of_year_median = median[11::12]
+        plt.plot(range(1, len(end_of_year_median) + 1), end_of_year_median, color + plot_spec, label=name)
+        plt.title('Span = {:.1f} Years'.format(span))
+        if plot_num in [2, 3]:
+            plt.xlabel('Prediction Year')
+        if plot_num in [0, 2]:
+            plt.ylabel('Prediction Median')
+        plt.legend(loc='upper right')
+        plt.grid(True)
+plt.suptitle('Per Estimator Prediction Median')
+plt.tight_layout()
+
+output_file_name = plots_dir + '/compare_example_median.png'
+plt.savefig(output_file_name)
+print('Saved output file ' + output_file_name)

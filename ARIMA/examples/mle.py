@@ -101,13 +101,15 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     cis = []
     one_year_mean_ci = []
     five_year_mean_ci = []
+    median = []
     for span, idx, sample, color in zip(spans, indices, samples, colors):
         cis.append(calc_percentiles(sample, confidence_interval))
         plt.fill_between(samples_year, cis[-1][0], cis[-1][1],
                          label='MLE Estimator at {:.1f} Years Observed Data Span at 90% CI'.format(span), color=color, alpha=0.5)
         one_year_mean_ci.append((cis[-1][1]-cis[-1][0])[:12].mean())
         five_year_mean_ci.append((cis[-1][1]-cis[-1][0]).mean())
-
+        median.append(calc_percentiles(sample, [0.5])[0])
+    
     plt.xlabel('Year')
     plt.ylabel('Value')
     plt.title('MLE Predictions at Various Observed Data Spans')

@@ -62,8 +62,9 @@ All the above examples can be run at once by executing
 python -m ARIMA.examples
 ```
 
-This will create an additional comparison between the confidence intervals of the MLE and Bayesian estimators.
+This will create additional comparisons between the median predictions and confidence intervals of the MLE and Bayesian estimators.
 
+![](/ARIMA/examples/plots/compare_example_median.png)
 ![](/ARIMA/examples/plots/compare_example_span_ci.png)
 
-It can be seen that as less observed data is available the MLE estimator becomes more confident in its predictions, whereas the Bayesian estimator becomes less confident in its predicitons, especially for the short term predictions.
+It can be seen that the two estimators have different median predictions, and that as less observed data is available the MLE estimator becomes more confident in its predictions, whereas the Bayesian estimator becomes less confident in its predicitons, especially for the short term predictions.

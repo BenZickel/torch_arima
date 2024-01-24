@@ -107,13 +107,15 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     cis = []
     one_year_mean_ci = []
     five_year_mean_ci = []
+    median = []
     for span, idx, model, sample, color in zip(spans, indices, models, samples, colors):
         cis.append(calc_percentiles(sample, confidence_interval))
-        ci = cis[-1][...,model.predict_idx]
+        ci = cis[-1][..., model.predict_idx]
         plt.fill_between(all_year[min(idx):][model.predict_idx], ci[0], ci[1],
                          label='Bayesian Estimator at {:.1f} Years Observed Data Span at 90% CI'.format(span), color=color, alpha=0.5)
         one_year_mean_ci.append((ci[1]-ci[0])[:12].mean())
         five_year_mean_ci.append((ci[1]-ci[0]).mean())
+        median.append(calc_percentiles(sample, [0.5])[0, model.predict_idx])
 
     plt.xlabel('Year')
     plt.ylabel('Value')
