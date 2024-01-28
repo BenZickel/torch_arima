@@ -1,4 +1,5 @@
 import torch as pt
+from torch.distributions.transforms import ComposeTransform
 from ARIMA.taylor import taylor
 from ARIMA.Polynomial import BiasOnePolynomial, PD
 from ARIMA.Transform import ARMATransform
@@ -53,12 +54,13 @@ class ARIMA(Transform, pt.nn.Module):
         >>> input_from_output = arima(output)
         >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 6)
     '''
-    def __init__(self, p, d, q, ps, ds, qs, s, drift=False, fix_i_tail=True, fix_o_tail=False):
+    def __init__(self, p, d, q, ps, ds, qs, s, drift=False, fix_i_tail=True, fix_o_tail=False, output_transforms=[]):
         super().__init__()
         self.PD = PD(p, d)
         self.Q = BiasOnePolynomial(q)
         self.PDS = PD(ps, ds, s)
         self.QS = BiasOnePolynomial(qs, s)
+        self.output_transforms = output_transforms
         
         # Calculate coefficients factors of observables
         o_coefs = taylor(lambda x: self.PD(x) * self.PDS(x), self.PD.degree() + self.PDS.degree() + 1)[::-1]
@@ -95,7 +97,8 @@ class ARIMA(Transform, pt.nn.Module):
         for i_hess, i_left, i_right in zip(self.i_hesss, i_params, i_params[1:]):
             i_coefs = i_coefs + pt.matmul(pt.matmul(i_left[..., None, None, :], i_hess), i_right[..., None, :, None])[..., 0, 0]
 
-        return ARMATransform(self.i_tail, self.o_tail, i_coefs, o_coefs, self.drift, *args, **kwargs)
+        return ComposeTransform([ARMATransform(self.i_tail, self.o_tail, i_coefs, o_coefs, self.drift,
+                                               *args, output_transforms=self.output_transforms, **kwargs)] + self.output_transforms)
 
 class VARIMA(Transform, pt.nn.Module):
     '''
@@ -125,7 +128,7 @@ class VARIMA(Transform, pt.nn.Module):
             x_vec = [None] * len(self.arimas)
         else:
             x_vec = [x[..., idx] for idx in range(x.shape[-1])]
-        return pt.distributions.transforms.CatTransform([arima.get_transform(*args, x=x_value, strip_last_idx=True, **kwargs)
+        return pt.distributions.transforms.StackTransform([arima.get_transform(*args, x=x_value, **kwargs)
                                                                                 for x_value, arima in zip(x_vec, self.arimas)], dim=-1)
 
 if __name__ == "__main__":
