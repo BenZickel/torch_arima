@@ -1,6 +1,6 @@
 import torch as pt
 from pyro.nn import PyroSample, PyroModule
-from pyro.distributions import Normal, LogNormal, MultivariateNormal
+from pyro.distributions import Normal, LogNormal, MultivariateNormal, LKJCholesky
 
 class NormalInnovations(PyroModule):
     def __init__(self, sigma_prior_dist=LogNormal, sigma_prior_dist_params=dict(loc=0, scale=5)):
@@ -19,19 +19,21 @@ class NormalInnovations(PyroModule):
                       self.sigma[..., None].expand(self.sigma.shape + (num_samples,))).to_event(1)
 
 class MultivariateNormalInnovations(PyroModule):
-    def __init__(self, n, sqrt_cov_prior_dist=Normal, sqrt_cov_prior_dist_params=dict(loc=0, scale=5)):
+    def __init__(self, n, sigma_prior_dist=LogNormal, sigma_prior_dist_params=dict(loc=0, scale=5)):
         super().__init__()
-        self.sqrt_cov_prior = sqrt_cov_prior_dist(**sqrt_cov_prior_dist_params).expand((n, n)).to_event(2)
-        self.sqrt_cov = PyroSample(self.sqrt_cov_prior)
+        self.sigma_prior = sigma_prior_dist(**sigma_prior_dist_params).expand((n,)).to_event(1)
+        self.scale_diag = PyroSample(self.sigma_prior)
+        self.scale_tril = PyroSample(LKJCholesky(n, 1))
 
     def shape(self, num_event_samples):
-        return self.sqrt_cov.shape[:-2] + (num_event_samples, self.sqrt_cov.shape[-1])
+        return self.scale_tril.shape[:-2] + (num_event_samples, self.scale_tril.shape[-1])
 
     def slice(self, event_samples_idx):
         return (Ellipsis, event_samples_idx, slice(None))
 
     def forward(self, num_samples):
-        cov = pt.matmul(self.sqrt_cov, pt.swapaxes(self.sqrt_cov, -1, -2))
-        return MultivariateNormal(                   pt.zeros(cov.shape[:-2] + (num_samples, cov.shape[-1])),
-                                  cov[..., None, :, :].expand(cov.shape[:-2] + (num_samples, cov.shape[-1], cov.shape[-1]))).to_event(1)
+        sqrt_cov = self.scale_tril * self.scale_diag[..., None]
+        return MultivariateNormal(pt.zeros(sqrt_cov.shape[:-2] + (num_samples, sqrt_cov.shape[-1])),
+                                  scale_tril = sqrt_cov[..., None, :, :].expand(sqrt_cov.shape[:-2] +
+                                                                                (num_samples, sqrt_cov.shape[-1], sqrt_cov.shape[-1]))).to_event(1)
                                            
