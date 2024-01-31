@@ -8,6 +8,7 @@ import numpy as np
 # Run all examples
 import ARIMA.examples.mle
 import ARIMA.examples.bayesian
+import ARIMA.examples.mortality
 
 plt.figure()
 for name, plot_spec, example in [('MLE', 'o-', ARIMA.examples.mle),
