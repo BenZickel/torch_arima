@@ -1,6 +1,13 @@
 # torch_arima
 
-ARIMA time series implementation in PyTorch implemented as a torch `torch.nn.Module` called `ARIMA`.
+ARIMA time series implementation in PyTorch supporting the following model types:
+
+| Model Type | Location | Description |
+|-|-|-|
+| ARIMA | `ARIMA.ARIMA` | `torch.nn.Module` with ARIMA polynomial coefficients as parameters and a forward method that converts observations to innovations and a predict method which converts innovations to observations. |
+| VARIMA | `ARIMA.VARIMA` | Same as `ARIMA.ARIMA` with support for vector innovations and vector observations. |
+| Bayesian ARIMA | `ARIMA.BayesianARIMA` | `pyro.nn.PyroModule` wrapper around `ARIMA.ARIMA` with support for priors to all polynomial coefficients and innovations distribution parameters. |
+| Bayesian VARIMA | `ARIMA.BayesianVARIMA` | Same as `ARIMA.VARIMA` with support for vector innovations and vector observations.|
 
 ## Installation
 
