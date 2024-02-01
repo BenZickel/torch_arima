@@ -104,3 +104,22 @@ The effect of COVID-19 on short term death count predictions can be visualized b
 The importance of using a VARIMA model, rather then a model comprised of two independent ARIMA models (a.k.a. Multiple ARIMA model), can be seen in the graph below where the confidence interval of the VARIMA model is much larger (as should be) than that of the Multiple ARIMA model, as it correctly captures the correlation between death counts of females and males.
 
 ![](/ARIMA/examples/plots/mortality_example_yearly_total.png)
+
+## Design
+
+An ARIMA(p,d,q) time series is defined by the equation (courtesy of [Wikipedia](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average))
+
+<img src="https://wikimedia.org/api/rest_v1/media/math/render/svg/12cc5e99bc1595494ef8219d70b304784e3933d0">
+
+with $X_i$ being the observations, $\epsilon_i$ being the innovations, and $L$ is the [lag operator](https://en.wikipedia.org/wiki/Lag_operator).
+
+The determinant of the Jacobian of the transformation from innovations to observations is equal to one since
+
+```math
+\begin{align}
+\frac{\partial X_i}{\partial \epsilon_i} &= 1 \text{  for all  } i \\
+\frac{\partial X_i}{\partial \epsilon_j} &= 0 \text{  for all  } j > i
+\end{align}
+```
+
+This means that the ARIMA transformation can be viewed as a change of random variable from innovations to observations, in which the probability density of innovations is equal to the probability density of the observations, which is how the core of the ARIMA module is implemented in [Transform.py](/ARIMA/Transform.py).
