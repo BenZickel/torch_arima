@@ -46,10 +46,13 @@ Utilizes `torch` optimizers in order to find the maximum likelihood estimator. R
 python -m ARIMA.examples.mle
 ```
 
+<a name="mle_example"></a>
 The below graphs will be created.
 
 ![](/ARIMA/examples/plots/mle_example.png)
+<a name="mle_example_span"></a>
 ![](/ARIMA/examples/plots/mle_example_span.png)
+<a name="mle_example_span_ci"></a>
 ![](/ARIMA/examples/plots/mle_example_span_ci.png)
 
 #### Bayesian Estimator
@@ -60,20 +63,27 @@ Utilizes `pyro` which is based on `torch` in order to find the Bayesian posterio
 python -m ARIMA.examples.bayesian
 ```
 
+<a name="bayesian_example"></a>
 The below graphs will be created.
 
 ![](/ARIMA/examples/plots/bayesian_example.png)
+<a name="bayesian_example_span"></a>
 ![](/ARIMA/examples/plots/bayesian_example_span.png)
+<a name="bayesian_example_span_ci"></a>
 ![](/ARIMA/examples/plots/bayesian_example_span_ci.png)
 
+<a name="bayesian_example_missing"></a>
 The Bayesian estimator can also estimate missing samples that occur at arbitrary times.
 
 ![](/ARIMA/examples/plots/bayesian_example_missing.png)
+<a name="bayesian_example_missing_ci"></a>
 ![](/ARIMA/examples/plots/bayesian_example_missing_ci.png)
 
 #### Comparison Between the Maximum Likelihood and Bayesian Estimators
 
+<a name="compare_example_median"></a>
 ![](/ARIMA/examples/plots/compare_example_median.png)
+<a name="compare_example_span_ci"></a>
 ![](/ARIMA/examples/plots/compare_example_span_ci.png)
 
 It can be seen that the two estimators have different median predictions, and that as less observed data is available the MLE estimator becomes more confident in its predictions, whereas the Bayesian estimator becomes less confident in its predicitons, especially for the short term predictions.
@@ -89,18 +99,22 @@ The example can be run by executing
 python -m ARIMA.examples.mortality
 ```
 
+<a name="mortality_example_monthly"></a>
 The below graph shows predicted weekly death counts for males and females. The model captures annual periodic changes in mortality and correlations between female and male death counts.
 
 ![](/ARIMA/examples/plots/mortality_example_monthly.png)
 
+<a name="mortality_example_yearly"></a>
 Viewed as an yearly moving sum the COVID-19 effect on death counts can be viewed more clearly as annual periodic changes in mortality are averaged out.
 
 ![](/ARIMA/examples/plots/mortality_example_yearly.png)
 
+<a name="mortality_example_yearly_pre_post_covid"></a>
 The effect of COVID-19 on short term death count predictions can be visualized by comparing predictions of a model that did not observe death counts during the COVID-19 pandemic (a.k.a. Pre COVID model), to a model that observed the most up to date data available (a.k.a. Post COVID model).
 
 ![](/ARIMA/examples/plots/mortality_example_yearly_pre_post_covid.png)
 
+<a name="mortality_example_yearly_total"></a>
 The importance of using a VARIMA model, rather then a model comprised of two independent ARIMA models (a.k.a. Multiple ARIMA model), can be seen in the graph below where the confidence interval of the VARIMA model is much larger (as should be) than that of the Multiple ARIMA model, as it correctly captures the correlation between death counts of females and males.
 
 ![](/ARIMA/examples/plots/mortality_example_yearly_total.png)
