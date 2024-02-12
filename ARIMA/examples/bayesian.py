@@ -10,7 +10,7 @@ import torch as pt
 import numpy as np
 import pyro
 import os
-from pyro.infer import Predictive
+from pyro.infer import Predictive, Importance
 from ARIMA import BayesianARIMA
 from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir
 from ARIMA.examples import __name__ as __examples__name__
@@ -157,6 +157,20 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
                                           num_samples=num_samples,
                                           return_sites=("_RETURN",))(observations[obs_idx])['_RETURN'])
 
+    # Calculate conditional probabilities of observing the missing samples given the known samples
+    missing_prob_observations = []
+    missing_prob_all = []
+    for missing_model, missing_guide in zip(missing_models, missing_guides):
+        missing_prob_observations.append(Importance(missing_model, guide=missing_guide, num_samples=num_samples))
+        missing_prob_observations[-1].run(observations[missing_model.obs_idx], missing_model.obs_idx)
+        missing_prob_all.append(Importance(missing_model, guide=missing_guide, num_samples=num_samples))
+        missing_prob_all[-1].run(observations, [*range(len(observations))])
+
+    prob_missing_given_obs = []
+    for p_obs, p_all in zip(missing_prob_observations, missing_prob_all):
+        prob_missing_given_obs.append(pt.logsumexp(pt.Tensor(p_all.log_weights), 0) -
+                                      pt.logsumexp(pt.Tensor(p_obs.log_weights), 0))
+
     # Calculate confidence intervals of predictions
     missing_cis = [calc_percentiles(s[...,m.predict_idx], confidence_interval) for s, m in zip(missing_samples, missing_models)]
     missing_mean_cis = [(ci[1] - ci[0]).mean() for ci in missing_cis]
@@ -181,13 +195,21 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     plt.savefig(output_file_name)
     print('Saved output file ' + output_file_name)
 
-    # Plot mean confidence interval versus missing samples location 
+    # Plot mean confidence interval and observation probability versus missing samples location 
     plt.figure()
+    plt.subplot(2, 1, 1)
     plt.plot(100 * missing_ratios, missing_mean_cis, 'bo-')
     plt.xlabel('Amount of Data Before First Missing Sample [%]')
     plt.ylabel('Mean 90% CI')
     plt.title('Bayesian Estimator 90% CI vs Missing Samples Location')
     plt.grid()
+    plt.subplot(2, 1, 2)
+    plt.plot(100 * missing_ratios, prob_missing_given_obs, 'ro-')
+    plt.xlabel('Amount of Data Before First Missing Sample [%]')
+    plt.ylabel('Probability Density')
+    plt.title('Missing Samples Probability Density vs Missing Samples Location')
+    plt.grid()
+    plt.tight_layout()
 
     output_file_name = plots_dir + '/bayesian_example_missing_ci.png'
     plt.savefig(output_file_name)

@@ -76,7 +76,10 @@ The below graphs will be created.
 The Bayesian estimator can also estimate missing samples that occur at arbitrary times.
 
 ![](/ARIMA/examples/plots/bayesian_example_missing.png)
+
 <a name="bayesian_example_missing_ci"></a>
+The probabilty density of observing certain values for the missing samples given the known observed samples $P(X_{Missing}|X_{Observed})$ can also be calculated using the Bayesian estimator. This probabilty density can be used as a score in a K-Fold cross validation scheme, where different folds have different missing samples.
+
 ![](/ARIMA/examples/plots/bayesian_example_missing_ci.png)
 
 #### Comparison Between the Maximum Likelihood and Bayesian Estimators
