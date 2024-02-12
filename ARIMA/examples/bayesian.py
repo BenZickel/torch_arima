@@ -39,7 +39,7 @@ def fit(model, observations,
             svi.step(observations)
     return guide
 
-if __name__ == "__main__" or __examples__name__ == "__main__":
+if __name__ == '__main__' or __examples__name__ == '__main__':
     ##########################################
     # Fit model to data and show predictions #
     ##########################################
@@ -54,11 +54,11 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
 
     # Make predictions
     num_samples = 1000
-    predictive = Predictive(model,
+    predictive = Predictive(model.predict,
                             guide=guide,
                             num_samples=num_samples,
-                            return_sites=("_RETURN",))
-    samples = predictive()['_RETURN']
+                            return_sites=('_RETURN',))
+    samples = predictive(observations[model.obs_idx])['_RETURN']
 
     confidence_interval = [0.05, 0.95]
 
@@ -96,10 +96,10 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
         indices.append(range(round((1 - ratio)*n), n))
         models.append(create_model([*range(len([*indices[-1]]))], num_predictions))
         guides.append(fit(models[-1], observations[indices[-1]]))
-        samples.append(Predictive(models[-1],
+        samples.append(Predictive(models[-1].predict,
                                   guide=guides[-1],
                                   num_samples=num_samples,
-                                  return_sites=("_RETURN",))()['_RETURN'])
+                                  return_sites=("_RETURN",))(observations[indices[-1]])['_RETURN'])
 
     plt.figure()
     spans = np.array(ratios) * (max(year) - min(year))
@@ -152,10 +152,10 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
         obs_idx = [idx for idx in range(len(observations)) if idx < start_predict or idx >= start_predict + num_predictions]
         missing_models.append(create_model(obs_idx, len(observations) - max(obs_idx) - 1))
         missing_guides.append(fit(missing_models[-1], observations[obs_idx]))
-        missing_samples.append(Predictive(missing_models[-1],
+        missing_samples.append(Predictive(missing_models[-1].predict,
                                           guide=missing_guides[-1],
                                           num_samples=num_samples,
-                                          return_sites=("_RETURN",))()['_RETURN'])
+                                          return_sites=("_RETURN",))(observations[obs_idx])['_RETURN'])
 
     # Calculate confidence intervals of predictions
     missing_cis = [calc_percentiles(s[...,m.predict_idx], confidence_interval) for s, m in zip(missing_samples, missing_models)]

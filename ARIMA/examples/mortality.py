@@ -61,11 +61,11 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
 
     # Make predictions
     num_samples = 1000
-    predictive = Predictive(model,
+    predictive = Predictive(model.predict,
                             guide=guide,
                             num_samples=num_samples,
                             return_sites=("_RETURN",))
-    samples = predictive()['_RETURN']
+    samples = predictive(observations[model.obs_idx])['_RETURN']
 
     confidence_interval = [0.05, 0.95]
 
@@ -138,11 +138,11 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     pre_covid_guide = fit(pre_covid_model, pre_covid_observations[pre_covid_model.obs_idx])
 
     # Make predictions
-    pre_covid_predictive = Predictive(pre_covid_model,
+    pre_covid_predictive = Predictive(pre_covid_model.predict,
                                       guide=pre_covid_guide,
                                       num_samples=num_samples,
                                       return_sites=("_RETURN",))
-    pre_covid_samples = pre_covid_predictive()['_RETURN']
+    pre_covid_samples = pre_covid_predictive(pre_covid_observations[pre_covid_model.obs_idx])['_RETURN']
 
     # Plot yearly death counts
     window_len = 12
@@ -196,11 +196,11 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     multi_arima_guide = fit(multi_arima_model, observations[multi_arima_model.obs_idx])
 
     # Make predictions
-    predictive = Predictive(multi_arima_model,
+    predictive = Predictive(multi_arima_model.predict,
                             guide=multi_arima_guide,
                             num_samples=num_samples,
                             return_sites=("_RETURN",))
-    multi_arima_samples = predictive()['_RETURN']
+    multi_arima_samples = predictive(observations[multi_arima_model.obs_idx])['_RETURN']
 
     # Calculate yearly moving sum
     period_multi_arima_samples = moving_sum(multi_arima_samples, window_len, 1)
