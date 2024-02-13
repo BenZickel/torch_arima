@@ -3,24 +3,30 @@ from torch.distributions.transforms import ComposeTransform
 from torch.distributions.constraints import independent, real
 
 def calc_arma_transform(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift):
+    assert(x_is_in_not_out.shape==x.shape[-1:])
     # Match dimensions
     input = input[[None] * (len(x.shape) - len(input.shape)) + [Ellipsis]].expand(*(x.shape[:-1] + (input.shape[-1],)))
     output = output[[None] * (len(x.shape) - len(output.shape)) + [Ellipsis]].expand(*(x.shape[:-1] + (output.shape[-1],)))
+    return calc_arma_transform_core(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift)
 
+@pt.jit.script
+def calc_arma_transform_core(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift):
     # Loop over input
     ret_val = []
+    i_coefs_len = i_coefs.shape[-1]
+    o_coefs_len = o_coefs.shape[-1]
+    i_coefs_less_one = i_coefs[..., :-1]
+    o_coefs_less_one = o_coefs[..., :-1]
     for n in range(x.shape[-1]):
-        if x_is_in_not_out[..., n]:
+        if x_is_in_not_out[n]:
             input = pt.cat([input, x[..., n][..., None]], dim=-1)
-            next_val = drift
-            next_val = next_val + (input[..., (-i_coefs.shape[-1]):] * i_coefs).sum(-1)[..., None]
-            next_val = next_val - (output[..., (-o_coefs.shape[-1]+1):] * o_coefs[..., :-1]).sum(-1)[..., None]
+            next_val = (input[..., (-i_coefs_len):]    * i_coefs).sum(-1)[..., None] - \
+                       (output[..., (-o_coefs_len+1):] * o_coefs_less_one).sum(-1)[..., None] + drift
             output = pt.cat([output, next_val], dim=-1)
         else:
             output = pt.cat([output, x[..., n][..., None]], dim=-1)
-            next_val = -drift
-            next_val = next_val + (output[..., (-o_coefs.shape[-1]):] * o_coefs).sum(-1)[..., None]
-            next_val = next_val - (input[..., (-i_coefs.shape[-1]+1):] * i_coefs[..., :-1]).sum(-1)[..., None]
+            next_val = (output[..., (-o_coefs_len):]   * o_coefs).sum(-1)[..., None] - \
+                       (input[..., (-i_coefs_len+1):]  * i_coefs_less_one).sum(-1)[..., None] - drift
             input = pt.cat([input, next_val], dim=-1)
         ret_val.append(next_val)
     return pt.cat(ret_val, dim=-1)

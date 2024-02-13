@@ -1,9 +1,9 @@
 
-import datetime
+import datetime, time, os
 import torch as pt
 import numpy as np
 import pandas as pd
-import os
+from functools import wraps, partial
 
 plots_dir = os.path.dirname(__file__) + '/plots'
 os.makedirs(plots_dir, exist_ok=True)
@@ -52,3 +52,16 @@ def moving_sum(data, window_len, dim):
         select[dim] = slice(start_idx, data.shape[dim] - window_len + start_idx + 1)
         ret_val += data[select]
     return ret_val
+
+def timeit(func=None, name=None, time_format=':.2f'):
+    if func is None:
+        return partial(timeit, name=name, time_format=time_format)
+    @wraps(func)
+    def timeit_wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
+        print(('Function {} took {' + time_format + '} seconds').format(func.__name__ if name is None else name, total_time))
+        return result
+    return timeit_wrapper

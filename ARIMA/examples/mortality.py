@@ -9,7 +9,7 @@ from torch.distributions.transforms import ExpTransform, AffineTransform
 from pyro.infer import Predictive
 from ARIMA import BayesianVARIMA
 from ARIMA.Innovations import NormalInnovationsVector, MultivariateNormalInnovations
-from ARIMA.examples.utils import load_mortality_data, calc_percentiles, moving_sum, plots_dir
+from ARIMA.examples.utils import load_mortality_data, calc_percentiles, moving_sum, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 
 def create_model(obs_idx, n, num_predictions, observations, innovations=MultivariateNormalInnovations):
@@ -24,20 +24,22 @@ def create_model(obs_idx, n, num_predictions, observations, innovations=Multivar
                           obs_idx=obs_idx, predict_idx=predict_idx,
                           output_transforms=output_transforms, innovations=innovations)
 
+@timeit
 def fit(model, observations,
         lr_sequence=[(0.005, 200),
                      (0.010, 200)] * 5 +
                     [(0.005, 200),
                      (0.001, 200)],
-        loss=pyro.infer.Trace_ELBO,
-        loss_params=dict(num_particles=100, vectorize_particles=True)):
+        loss=pyro.infer.JitTrace_ELBO,
+        loss_params=dict(num_particles=20, vectorize_particles=True, ignore_jit_warnings=True)):
     # Create posterior for Bayesian model
     guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
     guide(observations)
     guide.loc.data[:] = 0
+    loss = loss(**loss_params)
     for lr, num_iter in lr_sequence:
         optimizer = pyro.optim.Adam(dict(lr=lr))
-        svi = pyro.infer.SVI(model, guide, optimizer, loss=loss(**loss_params))
+        svi = pyro.infer.SVI(model, guide, optimizer, loss=loss)
         for count in range(num_iter):
             svi.step(observations)
     return guide
