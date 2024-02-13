@@ -206,7 +206,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     plt.subplot(2, 1, 2)
     plt.plot(100 * missing_ratios, prob_missing_given_obs, 'ro-')
     plt.xlabel('Amount of Data Before First Missing Sample [%]')
-    plt.ylabel('Probability Density')
+    plt.ylabel('Log of Probability Density')
     plt.title('Missing Samples Probability Density vs Missing Samples Location')
     plt.grid()
     plt.tight_layout()
