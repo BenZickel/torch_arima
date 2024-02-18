@@ -10,14 +10,15 @@ import torch as pt
 import numpy as np
 import os
 from ARIMA import ARIMA
-from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir
+from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 
+@timeit
 def fit(model, observations,
         lr_sequence=[(0.005, 100),
                      (0.010, 100)] * 5 +
                     [(0.005, 100),
-                     (0.001, 500)]):
+                     (0.001, 1000)]):
     # Optimize model parameters in order find the Maximum Likelihood Estimator (MLE).
     # In case of an ARIMA model maximizing the likelihood of the observations is equivalent to maxmizing the likelihood of the innovations as the Jacobian determinant of the transformation between the two is equal to one.
     # See a discussion with ChatGPT on the subject at https://chat.openai.com/share/55d34600-6b9d-49ea-b7de-0b70b0e2382f.

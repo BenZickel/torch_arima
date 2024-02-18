@@ -11,23 +11,26 @@ def calc_arma_transform(x, x_is_in_not_out, input, output, i_coefs, o_coefs, dri
 
 @pt.jit.script
 def calc_arma_transform_core(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift):
+    # Assume last coefficient is one
+    i_coefs = i_coefs[..., :-1]
+    o_coefs = o_coefs[..., :-1]
+    # Trim input and output
+    input = input[..., (-i_coefs.shape[-1]):]
+    output = output[..., (-o_coefs.shape[-1]):]
     # Loop over input
     ret_val = []
-    i_coefs_len = i_coefs.shape[-1]
-    o_coefs_len = o_coefs.shape[-1]
-    i_coefs_less_one = i_coefs[..., :-1]
-    o_coefs_less_one = o_coefs[..., :-1]
     for n in range(x.shape[-1]):
+        next_x = x[..., n][..., None]
         if x_is_in_not_out[n]:
-            input = pt.cat([input, x[..., n][..., None]], dim=-1)
-            next_val = (input[..., (-i_coefs_len):]    * i_coefs).sum(-1)[..., None] - \
-                       (output[..., (-o_coefs_len+1):] * o_coefs_less_one).sum(-1)[..., None] + drift
-            output = pt.cat([output, next_val], dim=-1)
+            next_val = next_x + ((input  * i_coefs).sum(-1) - \
+                                 (output * o_coefs).sum(-1))[..., None] + drift
+            input  = pt.cat([input[..., 1:],  next_x], dim=-1)
+            output = pt.cat([output[..., 1:], next_val], dim=-1)
         else:
-            output = pt.cat([output, x[..., n][..., None]], dim=-1)
-            next_val = (output[..., (-o_coefs_len):]   * o_coefs).sum(-1)[..., None] - \
-                       (input[..., (-i_coefs_len+1):]  * i_coefs_less_one).sum(-1)[..., None] - drift
-            input = pt.cat([input, next_val], dim=-1)
+            next_val = next_x + ((output * o_coefs).sum(-1) - \
+                                 (input  * i_coefs).sum(-1))[..., None] - drift
+            input  = pt.cat([input[..., 1:],  next_val], dim=-1)
+            output = pt.cat([output[..., 1:], next_x], dim=-1)
         ret_val.append(next_val)
     return pt.cat(ret_val, dim=-1)
 
