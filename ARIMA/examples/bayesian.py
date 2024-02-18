@@ -9,9 +9,10 @@ import matplotlib.pyplot as plt
 import torch as pt
 import numpy as np
 import pyro
-from pyro.infer import Predictive, Importance
+from pyro.infer import Predictive
 from ARIMA import BayesianARIMA
 from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir, timeit
+from ARIMA.pyro_utils import Importance
 from ARIMA.examples import __name__ as __examples__name__
 
 def create_model(obs_idx, num_predictions):
@@ -161,16 +162,13 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     # Calculate conditional probabilities of observing the missing samples given the known samples
     missing_prob_observations = []
     missing_prob_all = []
+    prob_missing_given_obs = []
     for missing_model, missing_guide in zip(missing_models, missing_guides):
         missing_prob_observations.append(Importance(missing_model, guide=missing_guide, num_samples=num_samples))
         missing_prob_observations[-1].run(observations[missing_model.obs_idx], missing_model.obs_idx)
         missing_prob_all.append(Importance(missing_model, guide=missing_guide, num_samples=num_samples))
         missing_prob_all[-1].run(observations, [*range(len(observations))])
-
-    prob_missing_given_obs = []
-    for p_obs, p_all in zip(missing_prob_observations, missing_prob_all):
-        prob_missing_given_obs.append(pt.logsumexp(pt.Tensor(p_all.log_weights), 0) -
-                                      pt.logsumexp(pt.Tensor(p_obs.log_weights), 0))
+        prob_missing_given_obs.append(missing_prob_all[-1].obs_log_prob() - missing_prob_observations[-1].obs_log_prob())
 
     # Calculate confidence intervals of predictions
     missing_cis = [calc_percentiles(s[...,m.predict_idx], confidence_interval) for s, m in zip(missing_samples, missing_models)]

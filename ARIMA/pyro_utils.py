@@ -1,6 +1,7 @@
 import pyro
 import torch as pt
 from pyro.nn import PyroSample, PyroParam
+from pyro.infer import Importance as PyroImportance
 
 def make_params_pyro(module, sample_names=True, dist_class=pyro.distributions.Normal, dist_params=dict(loc=0, scale=5)):
     '''
@@ -22,3 +23,11 @@ def make_params_pyro(module, sample_names=True, dist_class=pyro.distributions.No
     for child_module, name, pyro_param in update_list:
         delattr(child_module, name)
         setattr(child_module, name, pyro_param)
+
+class Importance(PyroImportance):
+    '''
+    Add method for calculating the log-probability of samples observed in the model by marginalizing over all latent variables using importance sampling.
+    This is useful for calculating conditional observations probabilities since P(Y|X) = P(X,Y)/P(X).
+    '''
+    def obs_log_prob(self):
+        return pt.logsumexp(pt.Tensor(self.log_weights), 0)
