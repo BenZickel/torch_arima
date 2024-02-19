@@ -45,11 +45,10 @@ class BayesianTimeSeries(PyroModule):
 
     def innovations(self):
         # Build innovations vector
-        innovations = pt.zeros(self.innovations_dist.shape(len(self.obs_idx) + len(self.predict_idx)))
+        innovations = pt.empty(self.innovations_dist.shape(len(self.obs_idx) + len(self.predict_idx))).fill_(pt.nan)
         innovations[self.innovations_dist.slice(self.predict_idx)] = self.predict_innovations
-        is_innovation = pt.zeros(len(self.obs_idx) + len(self.predict_idx)).bool()
+        is_innovation = pt.zeros(len(self.obs_idx) + len(self.predict_idx), dtype=pt.bool)
         is_innovation[self.predict_idx] = True
-        is_innovation[self.obs_idx] = False
         return innovations, is_innovation
 
     def observations_dist(self, obs_idx):
