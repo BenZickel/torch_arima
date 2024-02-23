@@ -52,7 +52,7 @@ class BiasOnePolynomial(Polynomial):
         return coefs
 
 def IntegratorPolynomial(n, multiplicity=1):
-    coefs = pt.zeros(1 + n * multiplicity)
+    coefs = pt.zeros(1 + multiplicity)
     coefs[-1] = -1.0
     return Polynomial(coefs) ** n
     
