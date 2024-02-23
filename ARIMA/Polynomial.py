@@ -7,6 +7,9 @@ class Polynomial(pt.nn.Module):
     
     def get_coefs(self):
         return self.coefs
+    
+    def get_params(self):
+        return []
 
     def __mul__(self, other):
         return TwoPolynomialOperation(self, other, 'Multiply')
@@ -37,6 +40,9 @@ class TwoPolynomialOperation(Polynomial):
             return coefs
         else:
             raise ('Operation {} is not supported.'.format(self.operation))
+        
+    def get_params(self):
+        return list(set(self.first_poly.get_params() + self.second_poly.get_params()))
 
 class BiasOnePolynomial(Polynomial):
     def __init__(self, n, multiplicity=1):
@@ -51,8 +57,12 @@ class BiasOnePolynomial(Polynomial):
         coefs[self.multiplicity::self.multiplicity] = self.coefs
         return coefs
 
+    def get_params(self):
+        return [self.coefs]
+
 def IntegratorPolynomial(n, multiplicity=1):
     coefs = pt.zeros(1 + multiplicity)
+    coefs[0] = 1.0
     coefs[-1] = -1.0
     return Polynomial(coefs) ** n
     

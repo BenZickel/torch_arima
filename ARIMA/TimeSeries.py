@@ -64,13 +64,13 @@ class ARIMA(Transform, pt.nn.Module):
         
         # Calculate coefficients factors of observables
         o_coefs = list((self.PD * self.PDS).get_coefs())[::-1]
-        o_grad_params = [*self.PD.parameters()] + [*self.PDS.parameters()]
+        o_grad_params = self.PD.get_params() + self.PDS.get_params()
         self.o_grads, self.o_hesss = calc_grads_hesss(o_coefs, o_grad_params, o_grad_params[1:])
         self.o_coefs = pt.cat([o_coef[None] for o_coef in o_coefs]).detach().clone()
         
         # Calculate coefficients factors of innovations
         i_coefs = list((self.Q * self.QS).get_coefs())[::-1]
-        i_grad_params = [*self.Q.parameters()] + [*self.QS.parameters()]
+        i_grad_params = self.Q.get_params() + self.QS.get_params()
         self.i_grads, self.i_hesss = calc_grads_hesss(i_coefs, i_grad_params, i_grad_params[1:])
         self.i_coefs = pt.cat([i_coef[None] for i_coef in i_coefs]).detach().clone()
         
@@ -82,7 +82,7 @@ class ARIMA(Transform, pt.nn.Module):
         
     def get_transform(self, *args, **kwargs):
         # Calculate coefficients of observations
-        o_params = [*self.PD.parameters()] + [*self.PDS.parameters()]
+        o_params = self.PD.get_params() + self.PDS.get_params()
         o_coefs = self.o_coefs
         for o_grad, o_param in zip(self.o_grads, o_params):
             o_coefs = o_coefs + pt.matmul(o_grad, o_param[...,None])[...,0]
@@ -90,7 +90,7 @@ class ARIMA(Transform, pt.nn.Module):
             o_coefs = o_coefs + pt.matmul(pt.matmul(o_left[..., None, None, :], o_hess), o_right[..., None, :, None])[..., 0, 0]
 
         # Calculate coefficients of innovations
-        i_params = [*self.Q.parameters()] + [*self.QS.parameters()]
+        i_params = self.Q.get_params() + self.QS.get_params()
         i_coefs = self.i_coefs
         for i_grad, i_param in zip(self.i_grads, i_params):
             i_coefs = i_coefs + pt.matmul(i_grad, i_param[..., None])[...,0]
