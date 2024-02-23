@@ -1,45 +1,60 @@
 import torch as pt
 
-class BiasOnePolynomial(pt.nn.Module):
+class Polynomial(pt.nn.Module):
+    def __init__(self, coefs=None):
+        super().__init__()
+        self.coefs = coefs
+    
+    def get_coefs(self):
+        return self.coefs
+
+    def __mul__(self, other):
+        return TwoPolynomialOperation(self, other, 'Multiply')
+
+    def __pow__(self, power):
+        retval = Polynomial(pt.Tensor([1.0]))
+        for count in range(power):
+            retval = retval * self
+        return retval
+
+class TwoPolynomialOperation(Polynomial):
+    def __init__(self, first_poly, second_poly, operation):
+        super().__init__()
+        self.first_poly = first_poly
+        self.second_poly = second_poly
+        self.operation = operation
+
+    def get_coefs(self):
+        if self.operation == 'Multiply':
+            # Do polynomial multiplication
+            first_poly_coefs = self.first_poly.get_coefs()
+            second_poly_coefs = self.second_poly.get_coefs()
+            coefs = pt.zeros(len(first_poly_coefs) + len(second_poly_coefs) - 1)
+            for n, coef in enumerate(first_poly_coefs):
+                temp = pt.zeros(len(first_poly_coefs) + len(second_poly_coefs) - 1)
+                temp[n:(n+len(second_poly_coefs))] = coef * second_poly_coefs
+                coefs = coefs + temp
+            return coefs
+        else:
+            raise ('Operation {} is not supported.'.format(self.operation))
+
+class BiasOnePolynomial(Polynomial):
     def __init__(self, n, multiplicity=1):
         super().__init__()
         self.bias = pt.tensor(1.0)
         self.multiplicity = multiplicity
-        self.coefs = pt.nn.Parameter(pt.zeros(n)) if n > 0 else None
-
-    def forward(self, x):
-        result = self.bias
-        if self.coefs is not None:
-            for n, coef in enumerate(self.coefs):
-                result = result + coef * x ** ((n+1) * self.multiplicity)
-        return result
-
-    def degree(self):
-        return len(self.coefs) * self.multiplicity if self.coefs is not None else 0
+        self.coefs = pt.nn.Parameter(pt.zeros(n))
 
     def get_coefs(self):
-        return [self.coefs] if self.coefs is not None else []
+        coefs = pt.zeros(1 + len(self.coefs) * self.multiplicity)
+        coefs[0] = self.bias
+        coefs[self.multiplicity::self.multiplicity] = self.coefs
+        return coefs
 
-class IntegratorPolynomial(pt.nn.Module):
-    def __init__(self, n, multiplicity=1):
-        super().__init__()
-        self.n = n
-        self.multiplicity = multiplicity
-
-    def forward(self, x):
-        return (1 - x ** self.multiplicity) ** self.n
+def IntegratorPolynomial(n, multiplicity=1):
+    coefs = pt.zeros(1 + n * multiplicity)
+    coefs[-1] = -1.0
+    return Polynomial(coefs) ** n
     
-    def degree(self):
-        return self.n * self.multiplicity
-    
-class PD(pt.nn.Module):
-    def __init__(self, p, d, multiplicity=1):
-        super().__init__()
-        self.P = BiasOnePolynomial(p, multiplicity)
-        self.D = IntegratorPolynomial(d, multiplicity)
-
-    def forward(self, x):
-        return self.P(x) * self.D(x)
-    
-    def degree(self):
-        return self.P.degree() + self.D.degree()
+def PD(p, d, multiplicity=1):
+    return BiasOnePolynomial(p, multiplicity) * IntegratorPolynomial(d, multiplicity)
