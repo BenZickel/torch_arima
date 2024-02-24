@@ -1,10 +1,13 @@
 import torch as pt
 import pyro
+import dill
+from io import BytesIO
 from pyro import distributions, poutine
 from pyro.nn import PyroSample, PyroParam
 from pyro.infer import Importance, Trace_ELBO
 from pyro.infer.importance import vectorized_importance_weights
 from typing import NamedTuple, Any
+from functools import partial
 
 def make_params_pyro(module, sample_names=True, dist_class=distributions.Normal, dist_params=dict(loc=0, scale=5)):
     '''
@@ -78,7 +81,7 @@ class ModifiedModelGuide:
                                 guide_trace.nodes[node]['value'].shape != model_trace.nodes[node]['value'].shape)
         model_block_nodes = set(node for node in model_trace.nodes if
                                 node not in guide_trace.nodes)
-        def modified_model_guide(*args, **kwargs):
+        def modified_model_guide(*ignore_args, **ignore_kwargs):
             trace = poutine.trace(poutine.block(guide, hide=guide_block_nodes)).get_trace()
             return poutine.block(poutine.replay(model, trace=trace), hide=set(trace.nodes).union(model_block_nodes))(*args, **kwargs)
         self.model = model
@@ -89,3 +92,12 @@ class ModifiedModelGuide:
 
     def __call__(self, *args, **kwargs):
         return self.modified_model_guide(*args, **kwargs)
+
+load = partial(pt.load, pickle_module=dill)
+save = partial(pt.save, pickle_module=dill)
+
+def clone(model):
+    buffer = BytesIO()
+    save(model, buffer)
+    buffer.seek(0)
+    return load(buffer)

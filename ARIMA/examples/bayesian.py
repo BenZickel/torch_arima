@@ -14,12 +14,14 @@ from ARIMA import BayesianARIMA
 from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir, timeit
 from ARIMA.pyro_utils import calc_obs_log_prob
 from ARIMA.examples import __name__ as __examples__name__
+from torch.distributions.transforms import ExpTransform
 
 def create_model(obs_idx, num_predictions):
     # Create model with non-overlapping observed and predicted sample indices.
     predict_idx = [*range(max(obs_idx) + 1 + num_predictions)]
     predict_idx = [idx for idx in predict_idx if idx not in obs_idx]
-    return BayesianARIMA(3, 0, 1, 0, 1, 2, 12, obs_idx=obs_idx, predict_idx=predict_idx)
+    return BayesianARIMA(3, 0, 1, 0, 1, 2, 12,
+                         obs_idx=obs_idx, predict_idx=predict_idx, output_transforms=[ExpTransform()])
 
 @timeit
 def fit(model, observations,
@@ -33,6 +35,7 @@ def fit(model, observations,
     guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
     guide(observations)
     guide.loc.data[:] = 0
+    guide.scale_unconstrained.data[:] = -5
     loss = loss(**loss_params)
     for lr, num_iter in lr_sequence:
         optimizer = pyro.optim.Adam(dict(lr=lr))
@@ -88,7 +91,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     #########################################################
     # Show effect of amount of training data on predictions #
     #########################################################
-    ratios = [1,1/2,1/4,1/8][::-1]
+    ratios = (0.6 ** np.arange(4))[::-1]
     models = []
     indices = []
     guides = []

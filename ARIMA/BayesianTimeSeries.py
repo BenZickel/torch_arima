@@ -32,9 +32,13 @@ class BayesianTimeSeries(PyroModule):
     def __init__(self, model, innovations, obs_idx, predict_idx):
         super().__init__()
         self.model = model
-        # Creating latent variables
+        # Creating model latent variables
         make_params_pyro(self)
         self.innovations_dist = innovations
+        self.set_indices(obs_idx, predict_idx)
+
+    def set_indices(self, obs_idx, predict_idx):
+        # Create innovations
         self.predict_innovations = PyroSample(lambda self: self.innovations_dist(len(self.predict_idx)))
         # Validate and store indices
         self.obs_idx = [*obs_idx]
@@ -42,6 +46,7 @@ class BayesianTimeSeries(PyroModule):
         if set(self.obs_idx).union(set(self.predict_idx)) != \
            set(range(len(self.obs_idx) + len(self.predict_idx))):
             raise UserWarning('Indices of observations and predictions must be complementary.')
+        return self
 
     def innovations(self):
         # Build innovations vector

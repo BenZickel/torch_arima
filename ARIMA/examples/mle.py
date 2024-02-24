@@ -12,6 +12,10 @@ import os
 from ARIMA import ARIMA
 from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
+from torch.distributions.transforms import ExpTransform
+
+def create_model():
+    return ARIMA(3, 0, 1, 0, 1, 2, 12, output_transforms=[ExpTransform()])
 
 @timeit
 def fit(model, observations,
@@ -40,7 +44,7 @@ def predict(model, innovations, num_samples, num_predictions):
         all_innovations = pt.cat([innovations, new_innovations])
         all_observations = model.predict(all_innovations).detach().numpy()
         samples.append(all_observations)
-    return np.array(samples)[...,len(innovations):]
+    return np.array(samples)[..., len(innovations):]
 
 if __name__ == "__main__" or __examples__name__ == "__main__":
     ##########################################
@@ -48,7 +52,7 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     ##########################################
     year, observations = load_data()
 
-    model = ARIMA(3,0,1,0,1,2,12)
+    model = create_model()
 
     fit_result = fit(model, observations)
     
@@ -84,7 +88,7 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     #########################################################
     # Show effect of amount of training data on predictions #
     #########################################################
-    ratios = [1,1/2,1/4,1/8]
+    ratios = 0.6 ** np.arange(4)
     models = []
     indices = []
     fit_results = []
@@ -92,7 +96,7 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     for ratio in ratios:
         n = len(observations)
         indices.append(range(round((1 - ratio)*n), n))
-        models.append(ARIMA(3,0,1,0,1,2,12))
+        models.append(create_model())
         fit_results.append(fit(models[-1], observations[indices[-1]]))
         samples.append(predict(models[-1], fit_results[-1]['innovations'], num_samples, num_predictions))
 
