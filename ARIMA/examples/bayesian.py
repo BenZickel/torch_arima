@@ -14,14 +14,19 @@ from ARIMA import BayesianARIMA
 from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir, timeit
 from ARIMA.pyro_utils import calc_obs_log_prob
 from ARIMA.examples import __name__ as __examples__name__
-from torch.distributions.transforms import ExpTransform
+from torch.distributions.transforms import ExpTransform, AffineTransform
 
 def create_model(obs_idx, num_predictions):
     # Create model with non-overlapping observed and predicted sample indices.
     predict_idx = [*range(max(obs_idx) + 1 + num_predictions)]
     predict_idx = [idx for idx in predict_idx if idx not in obs_idx]
+    # Normalize observations by an output transform
+    mean_log = observations.log().mean()
+    std_log = observations.log().std()
+    output_transforms = [AffineTransform(loc=mean_log, scale=std_log), ExpTransform()]
     return BayesianARIMA(3, 0, 1, 0, 1, 2, 12,
-                         obs_idx=obs_idx, predict_idx=predict_idx, output_transforms=[ExpTransform()])
+                         obs_idx=obs_idx, predict_idx=predict_idx,
+                         output_transforms=output_transforms)
 
 @timeit
 def fit(model, observations,
