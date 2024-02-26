@@ -44,10 +44,10 @@ class ARMATransform(pt.distributions.transforms.Transform):
     codomain = independent(real, 1)
     bijective = True
 
-    def __init__(self, i_tail, o_tail, i_coefs, o_coefs, drift, x=None, idx=None, x_is_in_not_out=None, output_transforms=[]):
+    def __init__(self, i_tail, o_tail, i_coefs, o_coefs, drift, x=None, idx=None, x_is_in_not_out=None):
         super().__init__()
         self.i_tail, self.o_tail, self.i_coefs, self.o_coefs, self.drift = i_tail, o_tail, i_coefs, o_coefs, drift
-        self.x, self.idx, self.x_is_in_not_out, self.output_transforms = x, idx, x_is_in_not_out, output_transforms
+        self.x, self.idx, self.x_is_in_not_out = x, idx, x_is_in_not_out
         if x_is_in_not_out is not None:
             if not x_is_in_not_out[idx].all():
                 raise UserWarning('Inputs must be innovations.')
@@ -61,7 +61,6 @@ class ARMATransform(pt.distributions.transforms.Transform):
             x_clone = self.x.clone()
             x_clone[..., self.idx] = x
             x = x_clone
-            x[..., ~x_is_in_not_out] = ComposeTransform(self.output_transforms).inv(x[..., ~x_is_in_not_out])
         return x, x_is_in_not_out
 
     def _call(self, x):

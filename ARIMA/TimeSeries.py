@@ -22,11 +22,11 @@ def calc_grads_hesss(coefs, grad_params, hess_params):
     return grads, hesss
 
 class Transform():
-    def forward(self, observations):
-        return self.get_transform().inv(observations)
+    def forward(self, observations, *args, **kwargs):
+        return self.get_transform(*args, **kwargs).inv(observations)
     
-    def predict(self, innovations):
-        return self.get_transform()(innovations)
+    def predict(self, innovations, *args, **kwargs):
+        return self.get_transform(*args, **kwargs)(innovations)
 
 class ARIMA(Transform, pt.nn.Module):
     '''
@@ -80,7 +80,7 @@ class ARIMA(Transform, pt.nn.Module):
         self.i_tail = i_tail if fix_i_tail else pt.nn.Parameter(i_tail)
         self.o_tail = o_tail if fix_o_tail else pt.nn.Parameter(o_tail)
         
-    def get_transform(self, *args, **kwargs):
+    def get_transform(self, x=None, idx=None, x_is_in_not_out=None):
         # Calculate coefficients of observations
         o_params = self.PD.get_params() + self.PDS.get_params()
         o_coefs = self.o_coefs
@@ -97,8 +97,14 @@ class ARIMA(Transform, pt.nn.Module):
         for i_hess, i_left, i_right in zip(self.i_hesss, i_params, i_params[1:]):
             i_coefs = i_coefs + pt.matmul(pt.matmul(i_left[..., None, None, :], i_hess), i_right[..., None, :, None])[..., 0, 0]
 
-        return ComposeTransform([ARMATransform(self.i_tail, self.o_tail, i_coefs, o_coefs, self.drift,
-                                               *args, output_transforms=self.output_transforms, **kwargs)] + self.output_transforms)
+        # Transform observations to their value at the ARMA transfrom output
+        if x_is_in_not_out is not None:
+            x = x.clone()
+            x[..., ~x_is_in_not_out] = ComposeTransform(self.output_transforms).inv(x[..., ~x_is_in_not_out])
+
+        return ComposeTransform([ARMATransform(self.i_tail, self.o_tail,
+                                               i_coefs, o_coefs, self.drift,
+                                               x, idx, x_is_in_not_out)] + self.output_transforms)
 
 class VARIMA(Transform, pt.nn.Module):
     '''
@@ -123,12 +129,12 @@ class VARIMA(Transform, pt.nn.Module):
         super().__init__()
         self.arimas = pt.nn.ModuleList(arimas)
         
-    def get_transform(self, *args, x=None, **kwargs):
+    def get_transform(self, x=None, idx=None, x_is_in_not_out=None):
         if x is None:
             x_vec = [None] * len(self.arimas)
         else:
             x_vec = [x[..., idx] for idx in range(x.shape[-1])]
-        return pt.distributions.transforms.StackTransform([arima.get_transform(*args, x=x_value, **kwargs)
+        return pt.distributions.transforms.StackTransform([arima.get_transform(x_value, idx, x_is_in_not_out)
                                                                                 for x_value, arima in zip(x_vec, self.arimas)], dim=-1)
 
 if __name__ == "__main__":
