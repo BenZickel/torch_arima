@@ -1,4 +1,5 @@
 import torch as pt
+import math
 from torch.distributions.transforms import ComposeTransform
 from ARIMA.taylor import taylor
 from ARIMA.Polynomial import BiasOnePolynomial, PD
@@ -21,6 +22,30 @@ def calc_grads_hesss(coefs, grad_params, hess_params):
     hesss = [pt.stack([pt.stack(h) for h in hess]).detach().clone() for hess in hesss]
     return grads, hesss
 
+def replicate_to_length(x, length, dim=-1):
+    shape = list(x.shape)
+    if shape[dim] == length:
+        return x
+    elif shape[dim] > length:
+        raise UserWarning('Length shorter than input at specified dimension.')
+    else:
+        sizes = [1] * len(shape)
+        sizes[dim] = math.ceil(length / shape[dim])
+        x = x.repeat(*sizes)
+        select = [slice(None)] * len(shape)
+        select[dim] = slice(length)
+        return x[select]
+
+def get_tail(tail_type, s, coefs):
+    if tail_type == 'zero':
+        return pt.zeros(len(coefs) - 1)
+    elif tail_type == 'full':
+        return pt.nn.Parameter(pt.zeros(len(coefs) - 1))
+    elif tail_type == 'seasonal':
+        return pt.nn.Parameter(pt.zeros(s))
+    else:
+        return pt.nn.Parameter(pt.zeros(tail_type))
+
 class Transform():
     def forward(self, observations, *args, **kwargs):
         return self.get_transform(*args, **kwargs).inv(observations)
@@ -41,20 +66,20 @@ class ARIMA(Transform, pt.nn.Module):
         qs: Seasonal moving average order.
         s: Seasonality
         drift: If set to ``True``, drift will be included.
-        fix_i_tail: If set to ``True``, the input tail will be fixed to zero.
-        fix_o_tail: If set to ``True``, the output tail will be fixed to zero.
-
+        i_tail_type: Set input tail to zero if 'zero', fully parametrized if 'full', seasonally parametrized if 'seasonal', and i_tail_type parametrized if an integer.
+        o_tail_type: Set output tail to zero if 'zero', fully parametrized if 'full', seasonally parametrized if 'seasonal', and i_tail_type parametrized if an integer.
+    
     Examples:
         >>> from ARIMA import ARIMA
         >>> from numpy.testing import assert_array_almost_equal
         >>> from torch import randn
-        >>> arima = ARIMA(2, 1, 1, 3, 0, 0, 4, True, True, True)
+        >>> arima = ARIMA(2, 1, 1, 3, 0, 0, 4, True, 'full', 'full')
         >>> input = randn(7)
         >>> output = arima.predict(input)
         >>> input_from_output = arima(output)
         >>> assert_array_almost_equal(input.detach().numpy(), input_from_output.detach().numpy(), 6)
     '''
-    def __init__(self, p, d, q, ps, ds, qs, s, drift=False, fix_i_tail=True, fix_o_tail=False, output_transforms=[]):
+    def __init__(self, p, d, q, ps, ds, qs, s, drift=False, i_tail_type='zero', o_tail_type='full', output_transforms=[]):
         super().__init__()
         self.PD = PD(p, d)
         self.Q = BiasOnePolynomial(q)
@@ -75,10 +100,8 @@ class ARIMA(Transform, pt.nn.Module):
         self.i_coefs = pt.cat([i_coef[None] for i_coef in i_coefs]).detach().clone()
         
         self.drift = pt.nn.Parameter(pt.zeros(1)) if drift else pt.zeros(1)
-        i_tail = pt.zeros(len(self.i_coefs) - 1)
-        o_tail = pt.zeros(len(self.o_coefs) - 1)
-        self.i_tail = i_tail if fix_i_tail else pt.nn.Parameter(i_tail)
-        self.o_tail = o_tail if fix_o_tail else pt.nn.Parameter(o_tail)
+        self.i_tail = get_tail(i_tail_type, s, self.i_coefs)
+        self.o_tail = get_tail(o_tail_type, s, self.o_coefs)
         
     def get_transform(self, x=None, idx=None, x_is_in_not_out=None):
         # Calculate coefficients of observations
@@ -102,7 +125,11 @@ class ARIMA(Transform, pt.nn.Module):
             x = x.clone()
             x[..., ~x_is_in_not_out] = ComposeTransform(self.output_transforms).inv(x[..., ~x_is_in_not_out])
 
-        return ComposeTransform([ARMATransform(self.i_tail, self.o_tail,
+        # Set tails to correct length
+        i_tail = replicate_to_length(self.i_tail, i_coefs.shape[-1] - 1)
+        o_tail = replicate_to_length(self.o_tail, o_coefs.shape[-1] - 1)
+        
+        return ComposeTransform([ARMATransform(i_tail, o_tail,
                                                i_coefs, o_coefs, self.drift,
                                                x, idx, x_is_in_not_out)] + self.output_transforms)
 
@@ -117,7 +144,7 @@ class VARIMA(Transform, pt.nn.Module):
         >>> from ARIMA import ARIMA, VARIMA
         >>> from numpy.testing import assert_array_almost_equal
         >>> from torch import randn
-        >>> varima = VARIMA([ARIMA(2, 1, 1, 3, 0, 0, 4, True, True, True) for count in range(5)])
+        >>> varima = VARIMA([ARIMA(2, 1, 1, 3, 0, 0, 4, True, 'full', 'full') for count in range(5)])
         >>> input = randn(7, 5)
         >>> output = varima.predict(input)
         >>> first_output = varima.arimas[0].predict(input[:, 0])
