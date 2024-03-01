@@ -47,8 +47,9 @@ class TwoPolynomialOperation(Polynomial):
 class BiasOnePolynomial(Polynomial):
     def __init__(self, n, multiplicity=1):
         super().__init__()
-        self.bias = pt.tensor(1.0)
+        self.n = n
         self.multiplicity = multiplicity
+        self.bias = pt.tensor(1.0)
         self.coefs = pt.nn.Parameter(pt.zeros(n))
 
     def get_coefs(self):
@@ -58,7 +59,7 @@ class BiasOnePolynomial(Polynomial):
         return coefs
 
     def get_params(self):
-        return [self.coefs]
+        return [self.coefs] if self.n > 0 else []
 
 def IntegratorPolynomial(n, multiplicity=1):
     coefs = pt.zeros(1 + multiplicity)
