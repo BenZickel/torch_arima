@@ -9,7 +9,7 @@ from pyro.infer.importance import vectorized_importance_weights
 from typing import NamedTuple, Any
 from functools import partial
 
-def make_params_pyro(module, sample_names=True, dist_class=distributions.Normal, dist_params=dict(loc=0, scale=5)):
+def make_params_pyro(module, param_names=[], dist_class=distributions.Normal, dist_params=dict(loc=0, scale=5)):
     '''
     Replace all module parameters with Pyro parameters
     '''
@@ -19,8 +19,8 @@ def make_params_pyro(module, sample_names=True, dist_class=distributions.Normal,
     # Convert all parameters to Pyro parameters with priors
     parameters = [*module.parameters()]
     pyro_parameters = [PyroSample(dist_class(**dist_params).expand(param.shape).to_event(len(param.shape)))
-                       if sample_names is True or name in sample_names else         
-                       PyroParam(pt.tensor(param)) for name, param in module.named_parameters()]
+                       if name not in param_names else         
+                       PyroParam(param) for name, param in module.named_parameters()]
     update_list = []
     for child_module in module.modules():
         for name, param in child_module.named_parameters(recurse=False):
