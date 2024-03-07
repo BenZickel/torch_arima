@@ -3,11 +3,13 @@ import pyro
 import dill
 from io import BytesIO
 from pyro import distributions, poutine
-from pyro.nn import PyroSample, PyroParam
+from pyro.nn import PyroSample, PyroParam, PyroModule
 from pyro.infer import Importance, Trace_ELBO
 from pyro.infer.importance import vectorized_importance_weights
 from typing import NamedTuple, Any
 from functools import partial
+
+ModuleList = PyroModule[pt.nn.ModuleList]
 
 def make_params_pyro(module, param_names=[], dist_class=distributions.Normal, dist_params=dict(loc=0, scale=5)):
     '''
@@ -34,6 +36,8 @@ class CalcObsLogProbResult(NamedTuple):
     obs_log_prob: Any
     log_weights: Any
     effective_sample_size: Any
+    model_trace: Any
+    guide_trace: Any
 
 def calc_obs_log_prob(model, guide, num_samples, args=tuple(), kwargs=dict(), vectorize=False):
     # Do sampling
@@ -48,13 +52,14 @@ def calc_obs_log_prob(model, guide, num_samples, args=tuple(), kwargs=dict(), ve
         importance_sampler = Importance(model, guide, num_samples=num_samples)
         importance_sampler.run(*args, **kwargs)
         log_weights = pt.tensor(importance_sampler.log_weights)
+        model_trace, guide_trace = None, None
     # Calculate observation probability
     log_num_samples = pt.log(pt.tensor(num_samples * 1.0))
     log_sum_weights = pt.logsumexp(log_weights, 0)
     log_norm_weights = log_weights - log_sum_weights
     effective_sample_size = pt.exp(-pt.logsumexp(2 * log_norm_weights, 0))
     obs_log_prob = log_sum_weights - log_num_samples
-    return CalcObsLogProbResult(obs_log_prob, log_weights, effective_sample_size)
+    return CalcObsLogProbResult(obs_log_prob, log_weights, effective_sample_size, model_trace, guide_trace)
 
 class ModifiedModelGuide:
     '''
@@ -93,11 +98,50 @@ class ModifiedModelGuide:
     def __call__(self, *args, **kwargs):
         return self.modified_model_guide(*args, **kwargs)
 
+# PyTorch load and save that supports loading and saving of inline lambda functions
 load = partial(pt.load, pickle_module=dill)
 save = partial(pt.save, pickle_module=dill)
 
+# PyTorch clone that supports cloning of inline lambda functions
 def clone(model):
     buffer = BytesIO()
     save(model, buffer)
     buffer.seek(0)
     return load(buffer)
+
+class MixtureGuide(PyroModule):
+    '''
+    Create guide that is a weighed mixture of guides of the same type with independent parameters for each guide.
+    '''
+    def __init__(self, guide, model, n_components, args=tuple(), kwargs=dict(), init_fn=None):
+        super().__init__()
+        self.guide_list = ModuleList()
+        for n_component in range(n_components):
+            # Create mixture component
+            self.guide_list.append(guide(model))
+            # Initialize mixture component
+            self.guide_list[-1](*args, **kwargs)
+            if init_fn is not None:
+                init_fn(self.guide_list[-1], n_component)
+
+    def __call__(self, *args, **kwargs):
+        alpha = pyro.param('alpha', pt.zeros(len(self.guide_list))).exp()
+        # Select with mixture component to use
+        idx = pyro.sample('idx', distributions.Categorical(alpha / sum(alpha)),
+                           infer={'enumerate': 'sequential', 'is_auxiliary': True})
+        # Sample selected mixture component
+        self.guide_list[idx](*args, **kwargs)
+
+def plate_log_prob_sum(trace, plate_name='num_particles_vectorized'):
+    '''
+    Get log probability sum from trace while keeping indexing over the specified plate.
+    '''
+    wd = trace.plate_to_symbol[plate_name]
+    log_prob_sum = 0.0
+    for site in trace.nodes.values():
+        if site["type"] != "sample":
+            continue
+        log_prob_sum += pt.einsum(
+            site["packed"]["log_prob"]._pyro_dims + "->" + wd,
+            [site["packed"]["log_prob"]])
+    return log_prob_sum
