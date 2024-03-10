@@ -10,8 +10,9 @@ import torch as pt
 import numpy as np
 import pyro
 from pyro.infer import Predictive
+from pyro.ops.stats import quantile
 from ARIMA import BayesianARIMA
-from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir, timeit
+from ARIMA.examples.utils import load_data, plots_dir, timeit
 from ARIMA.pyro_utils import calc_obs_log_prob
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform, AffineTransform
@@ -63,10 +64,11 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     guide = fit(model, observations[model.obs_idx])
 
     # Make predictions
-    num_samples = 1000
+    num_samples = 30000
     predictive = Predictive(model.predict,
                             guide=guide,
                             num_samples=num_samples,
+                            parallel=True,
                             return_sites=('_RETURN',))
     samples = predictive(observations[model.obs_idx])['_RETURN']
 
@@ -80,7 +82,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     # Plot confidence interval of predictions
     all_year = np.concatenate((year, year[-1] + (np.arange(len(model.obs_idx) + len(model.predict_idx) - len(year)) + 1) * np.diff(year).mean()))
     idx = sorted(set(np.clip([min(model.predict_idx) - 1, max(model.predict_idx) + 1] + model.predict_idx, 0, len(all_year) - 1)))
-    ci = calc_percentiles(samples[:,idx], confidence_interval)
+    ci = quantile(samples[:,idx], confidence_interval)
     plt.fill_between(all_year[idx], ci[0], ci[1], color='r', alpha=0.5, label='Bayesian Model Estimates at 90% CI')
     
     plt.xlabel('Year')
@@ -109,6 +111,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
         samples.append(Predictive(models[-1].predict,
                                   guide=guides[-1],
                                   num_samples=num_samples,
+                                  parallel=True,
                                   return_sites=("_RETURN",))(observations[indices[-1]])['_RETURN'])
 
     plt.figure()
@@ -119,13 +122,13 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     five_year_mean_ci = []
     median = []
     for span, idx, model, sample, color in zip(spans, indices, models, samples, colors):
-        cis.append(calc_percentiles(sample, confidence_interval))
+        cis.append(quantile(sample, confidence_interval))
         ci = cis[-1][..., model.predict_idx]
         plt.fill_between(all_year[min(idx):][model.predict_idx], ci[0], ci[1],
                          label='Bayesian Estimator at {:.1f} Years Observed Data Span at 90% CI'.format(span), color=color, alpha=0.5)
         one_year_mean_ci.append((ci[1]-ci[0])[:12].mean())
         five_year_mean_ci.append((ci[1]-ci[0]).mean())
-        median.append(calc_percentiles(sample, [0.5])[0, model.predict_idx])
+        median.append(quantile(sample, [0.5])[0, model.predict_idx])
 
     plt.xlabel('Year')
     plt.ylabel('Value')
@@ -143,7 +146,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     plt.xlabel('Observed Data Span [Years]')
     plt.ylabel('Mean 90% CI')
     plt.title('Bayesian Estimator 90% CI vs Observed Data Span')
-    plt.legend(loc='upper right')
+    plt.legend(loc='upper left')
     plt.grid()
 
     output_file_name = plots_dir + '/bayesian_example_span_ci.png'
@@ -165,6 +168,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
         missing_samples.append(Predictive(missing_models[-1].predict,
                                           guide=missing_guides[-1],
                                           num_samples=num_samples,
+                                          parallel=True,
                                           return_sites=("_RETURN",))(observations[obs_idx])['_RETURN'])
 
     # Calculate conditional probabilities of observing the missing samples given the known samples
@@ -182,7 +186,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
                                        missing_prob_observations[-1].obs_log_prob).detach().numpy())
 
     # Calculate confidence intervals of predictions
-    missing_cis = [calc_percentiles(s[...,m.predict_idx], confidence_interval) for s, m in zip(missing_samples, missing_models)]
+    missing_cis = [quantile(s[...,m.predict_idx], confidence_interval) for s, m in zip(missing_samples, missing_models)]
     missing_mean_cis = [(ci[1] - ci[0]).mean() for ci in missing_cis]
 
     # Plot predictions and actuals

@@ -8,11 +8,11 @@ Raw data downloaded from https://www.key2stats.com/data-set/view/764.
 import matplotlib.pyplot as plt
 import torch as pt
 import numpy as np
-import os
 from ARIMA import ARIMA
-from ARIMA.examples.utils import load_data, calc_percentiles, plots_dir, timeit
+from ARIMA.examples.utils import load_data, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform
+from pyro.ops.stats import quantile
 
 def create_model():
     return ARIMA(3, 0, 1, 0, 1, 2, 12, output_transforms=[ExpTransform()])
@@ -38,13 +38,10 @@ def fit(model, observations,
 
 def predict(model, innovations, num_samples, num_predictions):
     variance = (innovations**2).mean()
-    samples = []
-    for count in range(num_samples):
-        new_innovations = pt.randn(num_predictions) * variance.sqrt()
-        all_innovations = pt.cat([innovations, new_innovations])
-        all_observations = model.predict(all_innovations).detach().numpy()
-        samples.append(all_observations)
-    return np.array(samples)[..., len(innovations):]
+    new_innovations = pt.randn(num_samples, num_predictions) * variance.sqrt()
+    all_innovations = pt.cat([pt.stack([innovations] * num_samples), new_innovations], dim=-1)
+    all_observations = model.predict(all_innovations)
+    return all_observations[..., len(innovations):]
 
 if __name__ == "__main__" or __examples__name__ == "__main__":
     ##########################################
@@ -56,7 +53,7 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
 
     fit_result = fit(model, observations)
     
-    num_samples = 1000
+    num_samples = 30000
     num_predictions = 5 * 12
     samples = predict(model, fit_result['innovations'], num_samples, num_predictions)
 
@@ -69,7 +66,7 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
 
     # Plot confidence interval of predictions
     samples_year = max(year) + (np.arange(num_predictions) + 1) * np.diff(year).mean()
-    ci = calc_percentiles(samples, confidence_interval)
+    ci = quantile(samples, confidence_interval).detach().numpy()
     plt.fill_between([year[-1]] + list(samples_year),
                      [observations[-1]] + list(ci[0]),
                      [observations[-1]] + list(ci[1]),
@@ -108,12 +105,12 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     five_year_mean_ci = []
     median = []
     for span, idx, sample, color in zip(spans, indices, samples, colors):
-        cis.append(calc_percentiles(sample, confidence_interval))
+        cis.append(quantile(sample, confidence_interval).detach().numpy())
         plt.fill_between(samples_year, cis[-1][0], cis[-1][1],
                          label='MLE Estimator at {:.1f} Years Observed Data Span at 90% CI'.format(span), color=color, alpha=0.5)
         one_year_mean_ci.append((cis[-1][1]-cis[-1][0])[:12].mean())
         five_year_mean_ci.append((cis[-1][1]-cis[-1][0]).mean())
-        median.append(calc_percentiles(sample, [0.5])[0])
+        median.append(quantile(sample, [0.5])[0].detach().numpy())
     
     plt.xlabel('Year')
     plt.ylabel('Value')

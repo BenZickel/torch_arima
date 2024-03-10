@@ -27,7 +27,7 @@ def load_mortality_data():
     new_time = [value.to_timestamp().to_julian_date() for value in new_time]
     data['Date'] = time
     data = data.set_index('Date')
-    data = data.reindex(pd.unique(sorted(list(data.index)) + new_time))
+    data = data.reindex(pd.unique(np.array(sorted(list(data.index)) + new_time)))
     data = data.interpolate('index')
     data = data.reindex(new_time)
     data.index = pd.to_datetime(data.index, origin='julian', unit='D')
@@ -39,11 +39,6 @@ def load_data():
     year = data['time'].to_numpy()
     observations = pt.Tensor(data['value'])
     return year, observations
-
-def calc_percentiles(samples, percentiles):
-    samples = np.sort(samples, axis=0)
-    indices = [int(np.floor(p * samples.shape[0])) for p in percentiles]
-    return samples[indices]
 
 def moving_sum(data, window_len, dim):
     select = [slice(None)] * len(data.shape)

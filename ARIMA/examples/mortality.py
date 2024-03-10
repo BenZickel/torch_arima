@@ -7,9 +7,10 @@ import numpy as np
 import pyro
 from torch.distributions.transforms import ExpTransform, AffineTransform
 from pyro.infer import Predictive
+from pyro.ops.stats import quantile
 from ARIMA import BayesianVARIMA
 from ARIMA.Innovations import NormalInnovationsVector, MultivariateNormalInnovations
-from ARIMA.examples.utils import load_mortality_data, calc_percentiles, moving_sum, plots_dir, timeit
+from ARIMA.examples.utils import load_mortality_data, moving_sum, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 
 def create_model(obs_idx, n, num_predictions, observations, innovations=MultivariateNormalInnovations):
@@ -62,10 +63,11 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     guide = fit(model, observations[model.obs_idx])
 
     # Make predictions
-    num_samples = 1000
+    num_samples = 30000
     predictive = Predictive(model.predict,
                             guide=guide,
                             num_samples=num_samples,
+                            parallel=True,
                             return_sites=("_RETURN",))
     samples = predictive(observations[model.obs_idx])['_RETURN']
 
@@ -82,7 +84,7 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
         # Plot confidence interval of predictions
         all_year = np.concatenate((year, year[-1] + (np.arange(len(model.obs_idx) + len(model.predict_idx) - len(year)) + 1) * np.diff(year).mean()))
         idx = sorted(set(np.clip([min(model.predict_idx) - 1, max(model.predict_idx) + 1] + model.predict_idx, 0, len(all_year) - 1)))
-        ci = calc_percentiles(samples[:,idx,n], confidence_interval)
+        ci = quantile(samples[:,idx,n], confidence_interval)
         plt.fill_between(all_year[idx], ci[0], ci[1], color=color, alpha=0.5, label='Predicted {} at 90% CI'.format(name))
         
     plt.xlabel('Year')
@@ -105,12 +107,12 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     colors=['r', 'b']
     for n, color, name in zip(range(period_samples.shape[-1]), colors, data.columns):
         # Plot observations
-        median = calc_percentiles(period_samples, [0.5])[0]
+        median = quantile(period_samples, [0.5])[0]
         plt.plot(period_all_year,
                  median[:, n], color, label='Observed ' + name)
 
         # Plot confidence interval of predictions
-        ci = calc_percentiles(period_samples[:,-(num_predictions+1):,n], confidence_interval)
+        ci = quantile(period_samples[:,-(num_predictions+1):,n], confidence_interval)
         plt.fill_between(period_all_year[-(num_predictions+1):], ci[0], ci[1], color=color, alpha=0.5, label='Predicted {} at 90% CI'.format(name))
         
     plt.xlabel('Year')
@@ -143,6 +145,7 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     pre_covid_predictive = Predictive(pre_covid_model.predict,
                                       guide=pre_covid_guide,
                                       num_samples=num_samples,
+                                      parallel=True,
                                       return_sites=("_RETURN",))
     pre_covid_samples = pre_covid_predictive(pre_covid_observations[pre_covid_model.obs_idx])['_RETURN']
 
@@ -157,24 +160,24 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     colors=['r', 'b']
     for n, color, name in zip(range(period_samples.shape[-1]), colors, data.columns):
         # Plot observations
-        median = calc_percentiles(period_samples, [0.5])[0]
+        median = quantile(period_samples, [0.5])[0]
         plt.plot(period_all_year,
                  median[:, n], color, linewidth=3)
 
         # Plot confidence interval of predictions
-        ci = calc_percentiles(period_samples[:,-(num_predictions+1):,n], confidence_interval)
+        ci = quantile(period_samples[:,-(num_predictions+1):,n], confidence_interval)
         plt.fill_between(period_all_year[-(num_predictions+1):], ci[0], ci[1], color=color, alpha=0.6, label='Predicted Post COVID {} at 90% CI'.format(name))
     
     # Pre COVID predictions
     colors=['g', 'y']
     for n, color, name in zip(range(pre_covid_period_samples.shape[-1]), colors, data.columns):
         # Plot observations
-        median = calc_percentiles(pre_covid_period_samples, [0.5])[0]
+        median = quantile(pre_covid_period_samples, [0.5])[0]
         plt.plot(pre_covid_period_all_year,
                  median[:, n], color)
 
         # Plot confidence interval of predictions
-        ci = calc_percentiles(pre_covid_period_samples[:,-(pre_covid_num_predictions+1):,n], confidence_interval)
+        ci = quantile(pre_covid_period_samples[:,-(pre_covid_num_predictions+1):,n], confidence_interval)
         plt.fill_between(period_all_year[-(pre_covid_num_predictions+1):], ci[0], ci[1], color=color, alpha=0.6, label='Predicted Pre COVID {} at 90% CI'.format(name))
         
     plt.xlabel('Year')
@@ -201,6 +204,7 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     predictive = Predictive(multi_arima_model.predict,
                             guide=multi_arima_guide,
                             num_samples=num_samples,
+                            parallel=True,
                             return_sites=("_RETURN",))
     multi_arima_samples = predictive(observations[multi_arima_model.obs_idx])['_RETURN']
 
@@ -217,10 +221,10 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
                               colors, linewidths,
                               ['VARIMA', 'Multiple ARIMA']):
         # Plot confidence interval of predictions
-        ci = calc_percentiles(sample[:,-(num_predictions+1):], confidence_interval)
+        ci = quantile(sample[:,-(num_predictions+1):], confidence_interval)
         plt.fill_between(period_all_year[-(num_predictions+1):], ci[0], ci[1], color=color, alpha=0.5, label='{} Predictions at 90% CI'.format(name))
         # Plot observations and median
-        median = calc_percentiles(sample, [0.5])[0]
+        median = quantile(sample, [0.5])[0]
         plt.plot(period_all_year, median, color, linewidth=linewidth, label='{} Predictions Median'.format(name))
     
     plt.xlabel('Year')
