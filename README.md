@@ -78,7 +78,10 @@ The Bayesian estimator can also estimate missing samples that occur at arbitrary
 ![](/ARIMA/examples/plots/bayesian_example_missing.png)
 
 <a name="bayesian_example_missing_ci"></a>
-The probabilty density of observing certain values for the missing samples given the known observed samples $P(X_{Missing}|X_{Observed})$ can also be calculated using the Bayesian estimator. This probabilty density can be used as a score in a K-Fold cross validation scheme, where different folds have different missing samples.
+The accuracy of the predicted distribution of the missing samples can be measured using the energy score scoring rule (see equation 22 in [Gneiting2007jasa.pdf](https://sites.stat.washington.edu/raftery/Research/PDF/Gneiting2007jasa.pdf)). The energy score is minimized if and only if the predicted distribution is equal
+to the true distribution. In case of a fixed prediction the energy score is equal to the Euclidean distance between the multivariate prediction and the
+multivariate observation, which makes the energy score a natural extension of the Eucidean distance for fixed predictions to a scoring rule for non-fixed predicted distributions.
+The energy score can also be used as a score in a K-Fold cross validation scheme, where different folds have different missing samples.
 
 ![](/ARIMA/examples/plots/bayesian_example_missing_ci.png)
 
