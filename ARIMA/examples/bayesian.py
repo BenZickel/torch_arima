@@ -186,7 +186,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
 
     # Calculate the energy score of missing sample predictions
     missing_energy_score = [energy_score_empirical(pred=s[...,m.predict_idx],
-                                                   truth=observations[m.predict_idx]) / len(m.predict_idx)
+                                                   truth=observations[m.predict_idx]) / np.sqrt(len(m.predict_idx))
                                                                         for s, m in zip(missing_samples, missing_models)]
 
     # Plot predictions and actuals
