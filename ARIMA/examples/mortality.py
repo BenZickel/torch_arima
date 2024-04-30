@@ -6,7 +6,7 @@ import torch as pt
 import numpy as np
 import pyro
 from torch.distributions.transforms import ExpTransform, AffineTransform
-from pyro.infer import Predictive
+from pyro.infer import WeighedPredictive, MHResampler
 from pyro.ops.stats import quantile
 from ARIMA import BayesianVARIMA
 from ARIMA.Innovations import NormalInnovationsVector, MultivariateNormalInnovations
@@ -64,12 +64,15 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
 
     # Make predictions
     num_samples = 30000
-    predictive = Predictive(model.predict,
-                            guide=guide,
-                            num_samples=num_samples,
-                            parallel=True,
-                            return_sites=("_RETURN",))
-    samples = predictive(observations[model.obs_idx])['_RETURN']
+    predictive = WeighedPredictive(model.predict,
+                                   guide=guide,
+                                   num_samples=num_samples,
+                                   parallel=True,
+                                   return_sites=("_RETURN",))
+    resampler = MHResampler(predictive)
+    while resampler.get_total_transition_count() < num_samples:
+        samples = resampler(observations[model.obs_idx], model_guide=model)
+        samples = samples.samples['_RETURN']
 
     confidence_interval = [0.05, 0.95]
 
@@ -142,12 +145,15 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     pre_covid_guide = fit(pre_covid_model, pre_covid_observations[pre_covid_model.obs_idx])
 
     # Make predictions
-    pre_covid_predictive = Predictive(pre_covid_model.predict,
-                                      guide=pre_covid_guide,
-                                      num_samples=num_samples,
-                                      parallel=True,
-                                      return_sites=("_RETURN",))
-    pre_covid_samples = pre_covid_predictive(pre_covid_observations[pre_covid_model.obs_idx])['_RETURN']
+    pre_covid_predictive = WeighedPredictive(pre_covid_model.predict,
+                                             guide=pre_covid_guide,
+                                             num_samples=num_samples,
+                                             parallel=True,
+                                             return_sites=("_RETURN",))
+    pre_covid_resampler = MHResampler(pre_covid_predictive)
+    while pre_covid_resampler.get_total_transition_count() < num_samples:
+        pre_covid_samples = pre_covid_resampler(pre_covid_observations[pre_covid_model.obs_idx], model_guide=pre_covid_model)
+        pre_covid_samples = pre_covid_samples.samples['_RETURN']
 
     # Plot yearly death counts
     window_len = 12
@@ -201,12 +207,15 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     multi_arima_guide = fit(multi_arima_model, observations[multi_arima_model.obs_idx])
 
     # Make predictions
-    predictive = Predictive(multi_arima_model.predict,
-                            guide=multi_arima_guide,
-                            num_samples=num_samples,
-                            parallel=True,
-                            return_sites=("_RETURN",))
-    multi_arima_samples = predictive(observations[multi_arima_model.obs_idx])['_RETURN']
+    predictive = WeighedPredictive(multi_arima_model.predict,
+                                   guide=multi_arima_guide,
+                                   num_samples=num_samples,
+                                   parallel=True,
+                                   return_sites=("_RETURN",))
+    resampler = MHResampler(predictive)
+    while resampler.get_total_transition_count() < num_samples:
+        multi_arima_samples = resampler(observations[multi_arima_model.obs_idx], model_guide=multi_arima_model)
+        multi_arima_samples = multi_arima_samples.samples['_RETURN']
 
     # Calculate yearly moving sum
     period_multi_arima_samples = moving_sum(multi_arima_samples, window_len, 1)

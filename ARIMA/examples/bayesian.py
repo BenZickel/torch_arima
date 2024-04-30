@@ -72,7 +72,6 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     resampler = MHResampler(predictive)
     while resampler.get_total_transition_count() < num_samples:
         samples = resampler(observations[model.obs_idx], model_guide=model)
-        obs_prob_all = samples.model_log_prob
         samples = samples.samples['_RETURN']
     confidence_interval = [0.05, 0.95]
 
