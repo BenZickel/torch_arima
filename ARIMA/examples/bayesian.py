@@ -9,11 +9,10 @@ import matplotlib.pyplot as plt
 import torch as pt
 import numpy as np
 import pyro
-from pyro.infer import Predictive
-from pyro.ops.stats import quantile
+from pyro.infer import WeighedPredictive, MHResampler
+from pyro.ops.stats import quantile, energy_score_empirical
 from ARIMA import BayesianARIMA
 from ARIMA.examples.utils import load_data, plots_dir, timeit
-from ARIMA.pyro_utils import calc_obs_log_prob
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform, AffineTransform
 
@@ -65,13 +64,16 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
 
     # Make predictions
     num_samples = 30000
-    predictive = Predictive(model.predict,
-                            guide=guide,
-                            num_samples=num_samples,
-                            parallel=True,
-                            return_sites=('_RETURN',))
-    samples = predictive(observations[model.obs_idx])['_RETURN']
-
+    predictive = WeighedPredictive(model.predict,
+                                   guide=guide,
+                                   num_samples=num_samples,
+                                   parallel=True,
+                                   return_sites=('_RETURN',))
+    resampler = MHResampler(predictive)
+    while resampler.get_total_transition_count() < num_samples:
+        samples = resampler(observations[model.obs_idx], model_guide=model)
+        obs_prob_all = samples.model_log_prob
+        samples = samples.samples['_RETURN']
     confidence_interval = [0.05, 0.95]
 
     plt.figure()
@@ -108,11 +110,15 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
         indices.append(range(round((1 - ratio)*n), n))
         models.append(create_model([*range(len([*indices[-1]]))], num_predictions))
         guides.append(fit(models[-1], observations[indices[-1]]))
-        samples.append(Predictive(models[-1].predict,
-                                  guide=guides[-1],
-                                  num_samples=num_samples,
-                                  parallel=True,
-                                  return_sites=("_RETURN",))(observations[indices[-1]])['_RETURN'])
+        predictive = WeighedPredictive(models[-1].predict,
+                                       guide=guides[-1],
+                                       num_samples=num_samples,
+                                       parallel=True,
+                                       return_sites=("_RETURN",))
+        resampler = MHResampler(predictive)
+        while resampler.get_total_transition_count() < num_samples:
+            sample = resampler(observations[indices[-1]], model_guide=models[-1]).samples['_RETURN']
+        samples.append(sample)
 
     plt.figure()
     spans = np.array(ratios) * (max(year) - min(year))
@@ -165,29 +171,24 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
         obs_idx = [idx for idx in range(len(observations)) if idx < start_predict or idx >= start_predict + num_predictions]
         missing_models.append(create_model(obs_idx, len(observations) - max(obs_idx) - 1))
         missing_guides.append(fit(missing_models[-1], observations[obs_idx]))
-        missing_samples.append(Predictive(missing_models[-1].predict,
-                                          guide=missing_guides[-1],
-                                          num_samples=num_samples,
-                                          parallel=True,
-                                          return_sites=("_RETURN",))(observations[obs_idx])['_RETURN'])
-
-    # Calculate conditional probabilities of observing the missing samples given the known samples
-    missing_prob_observations = []
-    missing_prob_all = []
-    prob_missing_given_obs = []
-    for missing_model, missing_guide in zip(missing_models, missing_guides):
-        missing_prob_observations.append(calc_obs_log_prob(missing_model, missing_guide,
-                                                           args=(observations[missing_model.obs_idx], missing_model.obs_idx),
-                                                           num_samples=num_samples, vectorize=True))
-        missing_prob_all.append(calc_obs_log_prob(missing_model, missing_guide,
-                                                  args=(observations, [*range(len(observations))]),
-                                                  num_samples=num_samples, vectorize=True))
-        prob_missing_given_obs.append((missing_prob_all[-1].obs_log_prob -
-                                       missing_prob_observations[-1].obs_log_prob).detach().numpy())
+        predictive = WeighedPredictive(missing_models[-1].predict,
+                                       guide=missing_guides[-1],
+                                       num_samples=num_samples,
+                                       parallel=True,
+                                       return_sites=("_RETURN",))
+        resampler = MHResampler(predictive)
+        while resampler.get_total_transition_count() < num_samples:
+            sample = resampler(observations[obs_idx], model_guide=missing_models[-1]).samples['_RETURN']
+        missing_samples.append(sample)
 
     # Calculate confidence intervals of predictions
     missing_cis = [quantile(s[...,m.predict_idx], confidence_interval) for s, m in zip(missing_samples, missing_models)]
     missing_mean_cis = [(ci[1] - ci[0]).mean() for ci in missing_cis]
+
+    # Calculate the energy score of missing sample predictions
+    missing_energy_score = [energy_score_empirical(pred=s[...,m.predict_idx],
+                                                   truth=observations[m.predict_idx]) / len(m.predict_idx)
+                                                                        for s, m in zip(missing_samples, missing_models)]
 
     # Plot predictions and actuals
     plt.figure()
@@ -218,10 +219,10 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     plt.title('Bayesian Estimator 90% CI vs Missing Samples Location')
     plt.grid()
     plt.subplot(2, 1, 2)
-    plt.plot(100 * missing_ratios, prob_missing_given_obs, 'ro-')
+    plt.plot(100 * missing_ratios, missing_energy_score, 'ro-')
     plt.xlabel('Amount of Data Before First Missing Sample [%]')
-    plt.ylabel('Log of Probability Density')
-    plt.title('Missing Samples Probability Density vs Missing Samples Location')
+    plt.ylabel('Per Sample Energy Score')
+    plt.title('Missing Samples Energy Score vs Missing Samples Location')
     plt.grid()
     plt.tight_layout()
 
