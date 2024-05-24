@@ -15,6 +15,7 @@ from ARIMA import BayesianARIMA
 from ARIMA.examples.utils import load_data, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform, AffineTransform
+from ARIMA.Innovations import StableInnovations
 
 def create_model(obs_idx, num_predictions):
     # Create model with non-overlapping observed and predicted sample indices.
@@ -26,7 +27,7 @@ def create_model(obs_idx, num_predictions):
     output_transforms = [AffineTransform(loc=mean_log, scale=std_log), ExpTransform()]
     return BayesianARIMA(3, 0, 1, 0, 1, 2, 12,
                          obs_idx=obs_idx, predict_idx=predict_idx,
-                         output_transforms=output_transforms)
+                         output_transforms=output_transforms, innovations=StableInnovations)
 
 @timeit
 def fit(model, observations,
@@ -42,11 +43,13 @@ def fit(model, observations,
     guide.loc.data[:] = 0
     guide.scale_unconstrained.data[:] = -5
     loss = loss(**loss_params)
+    c = 0
     for lr, num_iter in lr_sequence:
         optimizer = pyro.optim.Adam(dict(lr=lr))
         svi = pyro.infer.SVI(model, guide, optimizer, loss=loss)
         for count in range(num_iter):
-            svi.step(observations)
+            print(c, svi.step(observations))
+            c += 1
     return guide
 
 if __name__ == '__main__' or __examples__name__ == '__main__':
@@ -63,7 +66,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     guide = fit(model, observations[model.obs_idx])
 
     # Make predictions
-    num_samples = 30000
+    num_samples = 1000
     predictive = WeighedPredictive(model.predict,
                                    guide=guide,
                                    num_samples=num_samples,

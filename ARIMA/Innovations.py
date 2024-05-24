@@ -1,6 +1,27 @@
 import torch as pt
 from pyro.nn import PyroSample, PyroModule
-from pyro.distributions import Normal, LogNormal, MultivariateNormal, LKJCholesky
+from pyro.distributions import Normal, LogNormal, MultivariateNormal, LKJCholesky, StableWithLogProb, Uniform
+
+
+class StableInnovations(PyroModule):
+    def __init__(self):
+        super().__init__()
+        self.sigma = PyroSample(LogNormal(loc=0, scale=5))
+        self.stability = PyroSample(Uniform(0, 2))
+        self.skew = PyroSample(Uniform(-1, 1))
+
+    def shape(self, num_event_samples):
+        return self.sigma.shape + (num_event_samples,)
+
+    def slice(self, event_samples_idx):
+        return (Ellipsis, event_samples_idx)
+
+    def forward(self, num_samples):
+        return StableWithLogProb(
+                    self.stability[..., None].expand(self.stability.shape + (num_samples,)),
+                    self.skew[..., None].expand(self.skew.shape + (num_samples,)),
+                    self.sigma[..., None].expand(self.sigma.shape + (num_samples,)), 0).to_event(1)
+    
 
 class NormalInnovations(PyroModule):
     def __init__(self, sigma_prior_dist=LogNormal, sigma_prior_dist_params=dict(loc=0, scale=5)):
