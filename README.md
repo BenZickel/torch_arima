@@ -1,6 +1,6 @@
 # torch_arima
 
-ARIMA time series implementation in PyTorch supporting the following model types:
+ARIMA time series implementation in [PyTorch](https://github.com/pytorch/pytorch), with optional support for Bayesian inference using the [Pyro](https://github.com/pyro-ppl/pyro) probablistic programming library, supporting the following model types:
 
 | Model Type | Location | Description |
 |-|-|-|
