@@ -16,7 +16,7 @@ from ARIMA.examples.utils import load_data, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform, AffineTransform
 
-def create_model(obs_idx, num_predictions):
+def create_model(obs_idx, num_predictions, observations, model_args=(3, 0, 1, 0, 1, 2, 12)):
     # Create model with non-overlapping observed and predicted sample indices.
     predict_idx = [*range(max(obs_idx) + 1 + num_predictions)]
     predict_idx = [idx for idx in predict_idx if idx not in obs_idx]
@@ -24,7 +24,7 @@ def create_model(obs_idx, num_predictions):
     mean_log = observations.log().mean()
     std_log = observations.log().std()
     output_transforms = [AffineTransform(loc=mean_log, scale=std_log), ExpTransform()]
-    return BayesianARIMA(3, 0, 1, 0, 1, 2, 12,
+    return BayesianARIMA(*model_args,
                          obs_idx=obs_idx, predict_idx=predict_idx,
                          output_transforms=output_transforms)
 
@@ -58,7 +58,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     num_predictions = 5 * 12
     obs_idx = range(len(observations))
 
-    model = create_model(obs_idx, num_predictions)
+    model = create_model(obs_idx, num_predictions, observations)
 
     guide = fit(model, observations[model.obs_idx])
 
@@ -107,7 +107,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     for ratio in ratios:
         n = len(observations)
         indices.append(range(round((1 - ratio)*n), n))
-        models.append(create_model([*range(len([*indices[-1]]))], num_predictions))
+        models.append(create_model([*range(len([*indices[-1]]))], num_predictions, observations[indices[-1]]))
         guides.append(fit(models[-1], observations[indices[-1]]))
         predictive = WeighedPredictive(models[-1].predict,
                                        guide=guides[-1],
@@ -168,7 +168,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     for missing_ratio in missing_ratios:
         start_predict = np.floor(missing_ratio * (len(observations) - num_predictions))
         obs_idx = [idx for idx in range(len(observations)) if idx < start_predict or idx >= start_predict + num_predictions]
-        missing_models.append(create_model(obs_idx, len(observations) - max(obs_idx) - 1))
+        missing_models.append(create_model(obs_idx, len(observations) - max(obs_idx) - 1, observations[obs_idx]))
         missing_guides.append(fit(missing_models[-1], observations[obs_idx]))
         predictive = WeighedPredictive(missing_models[-1].predict,
                                        guide=missing_guides[-1],
