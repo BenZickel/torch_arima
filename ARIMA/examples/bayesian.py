@@ -16,7 +16,7 @@ from ARIMA.examples.utils import load_data, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform, AffineTransform
 
-def create_model(obs_idx, num_predictions, observations, model_args=(3, 0, 1, 0, 1, 2, 12)):
+def create_model(obs_idx, num_predictions, observations, model_args=(3, 0, 1, 11, 1, 1, 12)):
     # Create model with non-overlapping observed and predicted sample indices.
     predict_idx = [*range(max(obs_idx) + 1 + num_predictions)]
     predict_idx = [idx for idx in predict_idx if idx not in obs_idx]
@@ -33,7 +33,7 @@ def fit(model, observations,
         lr_sequence=[(0.005, 100),
                      (0.010, 100)] * 5 +
                     [(0.005, 100),
-                     (0.001, 100)],
+                     (0.001, 5000)],
         loss=pyro.infer.JitTrace_ELBO,
         loss_params=dict(num_particles=20, vectorize_particles=True, ignore_jit_warnings=True)):
     # Create posterior for Bayesian model
