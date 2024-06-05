@@ -33,7 +33,7 @@ def fit(model, observations,
         lr_sequence=[(0.005, 100),
                      (0.010, 100)] * 5 +
                     [(0.005, 100),
-                     (0.001, 1000)],
+                     (0.001, 5000)],
         loss=pyro.infer.JitTrace_ELBO,
         loss_params=dict(num_particles=20, vectorize_particles=True, ignore_jit_warnings=True)):
     # Create posterior for Bayesian model
