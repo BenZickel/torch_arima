@@ -45,7 +45,7 @@ class BayesianTimeSeries(PyroModule):
            set(range(len(self.obs_idx) + len(self.predict_idx))):
             raise UserWarning('Indices of observations and predictions must be complementary.')
         # Create innovations
-        self.predict_innovations = PyroSample(lambda self: self.innovations_dist(len(self.predict_idx)))
+        self.predict_innovations = PyroSample(lambda self: self.innovations_dist(self.predict_idx))
         # Create observations
         self.observations = PyroSample(lambda self: self.observations_dist())
         return self
@@ -61,7 +61,7 @@ class BayesianTimeSeries(PyroModule):
     def observations_dist(self):
         combined, is_innovation = self.innovations()
         transform = self.model.get_transform(x=combined, idx=self.obs_idx)
-        return TransformedDistribution(self.innovations_dist(len(self.obs_idx)), [transform])
+        return TransformedDistribution(self.innovations_dist(self.obs_idx), [transform])
 
     def forward(self):
         # Return sampled observations

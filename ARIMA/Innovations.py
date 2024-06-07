@@ -2,6 +2,22 @@ import torch as pt
 from pyro.nn import PyroSample, PyroModule
 from pyro.distributions import Normal, LogNormal, MultivariateNormal, LKJCholesky
 
+
+def IndexIndependent(Innovations):
+    '''
+    Mark input class as generating innovations which are independent of their indices.
+    '''
+    class IndexIndependentInnovations(Innovations):
+        def forward(self, samples_idx):
+            try:
+                num_samples = len(samples_idx)
+            except TypeError:
+                num_samples = samples_idx
+            return super().forward(num_samples)
+    return IndexIndependentInnovations
+
+
+@IndexIndependent
 class NormalInnovations(PyroModule):
     def __init__(self, sigma_prior_dist=LogNormal, sigma_prior_dist_params=dict(loc=0, scale=5)):
         super().__init__()
@@ -18,6 +34,8 @@ class NormalInnovations(PyroModule):
         return Normal(                    pt.zeros(self.sigma.shape + (num_samples,)),
                       self.sigma[..., None].expand(self.sigma.shape + (num_samples,))).to_event(1)
 
+
+@IndexIndependent
 class NormalInnovationsVector(PyroModule):
     def __init__(self, n, sigma_prior_dist=LogNormal, sigma_prior_dist_params=dict(loc=0, scale=5)):
         super().__init__()
@@ -35,6 +53,8 @@ class NormalInnovationsVector(PyroModule):
                       self.sigma[..., None, :].expand(self.sigma.shape[:-1] +
                                                        (num_samples, self.sigma.shape[-1]))).to_event(2)
 
+
+@IndexIndependent
 class MultivariateNormalInnovations(PyroModule):
     def __init__(self, n, sigma_prior_dist=LogNormal, sigma_prior_dist_params=dict(loc=0, scale=5)):
         super().__init__()
