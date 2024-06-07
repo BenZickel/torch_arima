@@ -22,7 +22,7 @@ def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNorma
         >>> predict_idx = [*range(10,17)]
         >>> n = 5
         >>> model = BayesianVARIMA(3, 0, 1, 0, 1, 2, 12, n=n, obs_idx=obs_idx, predict_idx=predict_idx)
-        >>> with pyro.poutine.trace(): ret_val = model.predict(pt.zeros(len(obs_idx), n))
+        >>> with pyro.poutine.trace(): ret_val = model.predict()
         >>> ret_val.shape
         torch.Size([17, 5])
     '''
