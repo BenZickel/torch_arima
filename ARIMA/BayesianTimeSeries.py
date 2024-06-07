@@ -38,14 +38,16 @@ class BayesianTimeSeries(PyroModule):
         self.set_indices(obs_idx, predict_idx)
 
     def set_indices(self, obs_idx, predict_idx):
-        # Create innovations
-        self.predict_innovations = PyroSample(lambda self: self.innovations_dist(len(self.predict_idx)))
         # Validate and store indices
         self.obs_idx = [*obs_idx]
         self.predict_idx = [*predict_idx]
         if set(self.obs_idx).union(set(self.predict_idx)) != \
            set(range(len(self.obs_idx) + len(self.predict_idx))):
             raise UserWarning('Indices of observations and predictions must be complementary.')
+        # Create innovations
+        self.predict_innovations = PyroSample(lambda self: self.innovations_dist(len(self.predict_idx)))
+        # Create observations
+        self.observations = PyroSample(lambda self: self.observations_dist())
         return self
 
     def innovations(self):
@@ -56,19 +58,20 @@ class BayesianTimeSeries(PyroModule):
         is_innovation[self.predict_idx] = True
         return innovations, is_innovation
 
-    def observations_dist(self, obs_idx):
+    def observations_dist(self):
         combined, is_innovation = self.innovations()
-        transform = self.model.get_transform(x=combined, idx=obs_idx)
-        return TransformedDistribution(self.innovations_dist(len(obs_idx)), [transform])
+        transform = self.model.get_transform(x=combined, idx=self.obs_idx)
+        return TransformedDistribution(self.innovations_dist(len(self.obs_idx)), [transform])
 
-    def forward(self, observations, obs_idx=None):
-        pyro.sample('observations', self.observations_dist(obs_idx=self.obs_idx if obs_idx is None else obs_idx), obs=observations)
+    def forward(self):
+        # Return sampled observations
+        return self.observations
         
     @pyro_method
-    def predict(self, observations):
-        # Return predictions
+    def predict(self):
+        # Return predictions combined with observations
         combined, is_innovation = self.innovations()
-        combined[self.innovations_dist.slice(self.obs_idx)] = observations
+        combined[self.innovations_dist.slice(self.obs_idx)] = self.observations
         transform = self.model.get_transform(x=combined, idx=self.predict_idx, x_is_in_not_out=is_innovation)
         combined[self.innovations_dist.slice(self.predict_idx)] = transform(combined[self.innovations_dist.slice(self.predict_idx)])
         return combined

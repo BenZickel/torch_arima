@@ -29,7 +29,7 @@ def create_model(obs_idx, num_predictions, observations, model_args=(3, 0, 1, 0,
                          output_transforms=output_transforms)
 
 @timeit
-def fit(model, observations,
+def fit(model,
         lr_sequence=[(0.005, 100),
                      (0.010, 100)] * 5 +
                     [(0.005, 100),
@@ -38,7 +38,7 @@ def fit(model, observations,
         loss_params=dict(num_particles=20, vectorize_particles=True, ignore_jit_warnings=True)):
     # Create posterior for Bayesian model
     guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
-    guide(observations)
+    guide()
     guide.loc.data[:] = 0
     guide.scale_unconstrained.data[:] = -5
     loss = loss(**loss_params)
@@ -46,7 +46,7 @@ def fit(model, observations,
         optimizer = pyro.optim.Adam(dict(lr=lr))
         svi = pyro.infer.SVI(model, guide, optimizer, loss=loss)
         for count in range(num_iter):
-            svi.step(observations)
+            svi.step()
     return guide
 
 if __name__ == '__main__' or __examples__name__ == '__main__':
@@ -59,19 +59,21 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     obs_idx = range(len(observations))
 
     model = create_model(obs_idx, num_predictions, observations)
+    conditioned_model = pyro.poutine.condition(model, data={'observations': observations[model.obs_idx]})
+    conditioned_predict = pyro.poutine.condition(model.predict, data={'observations': observations[model.obs_idx]})
 
-    guide = fit(model, observations[model.obs_idx])
+    guide = fit(conditioned_model)
 
     # Make predictions
     num_samples = 30000
-    predictive = WeighedPredictive(model.predict,
+    predictive = WeighedPredictive(conditioned_predict,
                                    guide=guide,
                                    num_samples=num_samples,
                                    parallel=True,
                                    return_sites=('_RETURN',))
     resampler = MHResampler(predictive)
     while resampler.get_total_transition_count() < num_samples:
-        samples = resampler(observations[model.obs_idx], model_guide=model)
+        samples = resampler(model_guide=conditioned_model)
         samples = samples.samples['_RETURN']
     confidence_interval = [0.05, 0.95]
 
@@ -108,15 +110,17 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
         n = len(observations)
         indices.append(range(round((1 - ratio)*n), n))
         models.append(create_model([*range(len([*indices[-1]]))], num_predictions, observations[indices[-1]]))
-        guides.append(fit(models[-1], observations[indices[-1]]))
-        predictive = WeighedPredictive(models[-1].predict,
+        conditioned_model = pyro.poutine.condition(models[-1], data={'observations': observations[indices[-1]]})
+        conditioned_predict = pyro.poutine.condition(models[-1].predict, data={'observations': observations[indices[-1]]})
+        guides.append(fit(conditioned_model))
+        predictive = WeighedPredictive(conditioned_predict,
                                        guide=guides[-1],
                                        num_samples=num_samples,
                                        parallel=True,
                                        return_sites=("_RETURN",))
         resampler = MHResampler(predictive)
         while resampler.get_total_transition_count() < num_samples:
-            sample = resampler(observations[indices[-1]], model_guide=models[-1]).samples['_RETURN']
+            sample = resampler(model_guide=conditioned_model).samples['_RETURN']
         samples.append(sample)
 
     plt.figure()
@@ -169,15 +173,17 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
         start_predict = np.floor(missing_ratio * (len(observations) - num_predictions))
         obs_idx = [idx for idx in range(len(observations)) if idx < start_predict or idx >= start_predict + num_predictions]
         missing_models.append(create_model(obs_idx, len(observations) - max(obs_idx) - 1, observations[obs_idx]))
-        missing_guides.append(fit(missing_models[-1], observations[obs_idx]))
-        predictive = WeighedPredictive(missing_models[-1].predict,
+        conditioned_model = pyro.poutine.condition(missing_models[-1], data={'observations': observations[obs_idx]})
+        conditioned_predict = pyro.poutine.condition(missing_models[-1].predict, data={'observations': observations[obs_idx]})
+        missing_guides.append(fit(conditioned_model))
+        predictive = WeighedPredictive(conditioned_predict,
                                        guide=missing_guides[-1],
                                        num_samples=num_samples,
                                        parallel=True,
                                        return_sites=("_RETURN",))
         resampler = MHResampler(predictive)
         while resampler.get_total_transition_count() < num_samples:
-            sample = resampler(observations[obs_idx], model_guide=missing_models[-1]).samples['_RETURN']
+            sample = resampler(model_guide=conditioned_model).samples['_RETURN']
         missing_samples.append(sample)
 
     # Calculate confidence intervals of predictions

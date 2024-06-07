@@ -13,7 +13,8 @@ from ARIMA.Innovations import NormalInnovationsVector, MultivariateNormalInnovat
 from ARIMA.examples.utils import load_mortality_data, moving_sum, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 
-def create_model(obs_idx, n, num_predictions, observations, innovations=MultivariateNormalInnovations):
+def create_model(obs_idx, n, num_predictions, observations,
+                 innovations=MultivariateNormalInnovations, model_args=(2, 0, 1, 0, 1, 1, 12)):
     # Create model with non-overlapping observed and predicted sample indices.
     predict_idx = [*range(max(obs_idx) + 1 + num_predictions)]
     predict_idx = [idx for idx in predict_idx if idx not in obs_idx]
@@ -21,12 +22,12 @@ def create_model(obs_idx, n, num_predictions, observations, innovations=Multivar
     mean_log = observations.log().mean()
     std_log = observations.log().std()
     output_transforms = [AffineTransform(loc=mean_log, scale=std_log), ExpTransform()]
-    return BayesianVARIMA(2, 0, 1, 0, 1, 1, 12, drift=True, n=n,
+    return BayesianVARIMA(*model_args, drift=True, n=n,
                           obs_idx=obs_idx, predict_idx=predict_idx,
                           output_transforms=output_transforms, innovations=innovations)
 
 @timeit
-def fit(model, observations,
+def fit(model,
         lr_sequence=[(0.005, 200),
                      (0.010, 200)] * 5 +
                     [(0.005, 200),
@@ -35,14 +36,14 @@ def fit(model, observations,
         loss_params=dict(num_particles=20, vectorize_particles=True, ignore_jit_warnings=True)):
     # Create posterior for Bayesian model
     guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
-    guide(observations)
+    guide()
     guide.loc.data[:] = 0
     loss = loss(**loss_params)
     for lr, num_iter in lr_sequence:
         optimizer = pyro.optim.Adam(dict(lr=lr))
         svi = pyro.infer.SVI(model, guide, optimizer, loss=loss)
         for count in range(num_iter):
-            svi.step(observations)
+            svi.step()
     return guide
 
 if __name__ == "__main__" or __examples__name__ == "__main__":
@@ -59,19 +60,21 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     pyro.clear_param_store()
 
     model = create_model(obs_idx, observations.shape[-1], num_predictions, observations)
+    conditioned_model = pyro.poutine.condition(model, data={'observations': observations[model.obs_idx]})
+    conditioned_predict = pyro.poutine.condition(model.predict, data={'observations': observations[model.obs_idx]})
 
-    guide = fit(model, observations[model.obs_idx])
+    guide = fit(conditioned_model)
 
     # Make predictions
     num_samples = 30000
-    predictive = WeighedPredictive(model.predict,
+    predictive = WeighedPredictive(conditioned_predict,
                                    guide=guide,
                                    num_samples=num_samples,
                                    parallel=True,
                                    return_sites=("_RETURN",))
     resampler = MHResampler(predictive)
     while resampler.get_total_transition_count() < num_samples:
-        samples = resampler(observations[model.obs_idx], model_guide=model)
+        samples = resampler(model_guide=conditioned_model)
         samples = samples.samples['_RETURN']
 
     confidence_interval = [0.05, 0.95]
@@ -141,18 +144,20 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     pyro.clear_param_store()
 
     pre_covid_model = create_model(pre_covid_obs_idx, pre_covid_observations.shape[-1], pre_covid_num_predictions, pre_covid_observations)
+    pre_covid_conditioned_model = pyro.poutine.condition(pre_covid_model, data={'observations': pre_covid_observations[pre_covid_model.obs_idx]})
+    pre_covid_conditioned_predict = pyro.poutine.condition(pre_covid_model.predict, data={'observations': pre_covid_observations[pre_covid_model.obs_idx]})
 
-    pre_covid_guide = fit(pre_covid_model, pre_covid_observations[pre_covid_model.obs_idx])
+    pre_covid_guide = fit(pre_covid_conditioned_model)
 
     # Make predictions
-    pre_covid_predictive = WeighedPredictive(pre_covid_model.predict,
+    pre_covid_predictive = WeighedPredictive(pre_covid_conditioned_predict,
                                              guide=pre_covid_guide,
                                              num_samples=num_samples,
                                              parallel=True,
                                              return_sites=("_RETURN",))
     pre_covid_resampler = MHResampler(pre_covid_predictive)
     while pre_covid_resampler.get_total_transition_count() < num_samples:
-        pre_covid_samples = pre_covid_resampler(pre_covid_observations[pre_covid_model.obs_idx], model_guide=pre_covid_model)
+        pre_covid_samples = pre_covid_resampler(model_guide=pre_covid_conditioned_model)
         pre_covid_samples = pre_covid_samples.samples['_RETURN']
 
     # Plot yearly death counts
@@ -203,18 +208,20 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     pyro.clear_param_store()
 
     multi_arima_model = create_model(obs_idx, observations.shape[-1], num_predictions, observations, innovations=NormalInnovationsVector)
+    multi_arima_conditioned_model = pyro.poutine.condition(multi_arima_model, data={'observations': observations[multi_arima_model.obs_idx]})
+    multi_arima_conditioned_predict = pyro.poutine.condition(multi_arima_model.predict, data={'observations': observations[multi_arima_model.obs_idx]})
 
-    multi_arima_guide = fit(multi_arima_model, observations[multi_arima_model.obs_idx])
+    multi_arima_guide = fit(multi_arima_conditioned_model)
 
     # Make predictions
-    predictive = WeighedPredictive(multi_arima_model.predict,
+    predictive = WeighedPredictive(multi_arima_conditioned_predict,
                                    guide=multi_arima_guide,
                                    num_samples=num_samples,
                                    parallel=True,
                                    return_sites=("_RETURN",))
     resampler = MHResampler(predictive)
     while resampler.get_total_transition_count() < num_samples:
-        multi_arima_samples = resampler(observations[multi_arima_model.obs_idx], model_guide=multi_arima_model)
+        multi_arima_samples = resampler(model_guide=multi_arima_conditioned_model)
         multi_arima_samples = multi_arima_samples.samples['_RETURN']
 
     # Calculate yearly moving sum
