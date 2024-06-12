@@ -12,6 +12,7 @@ import pyro
 from pyro.infer import WeighedPredictive, MHResampler
 from pyro.ops.stats import quantile, energy_score_empirical
 from ARIMA import BayesianARIMA
+from ARIMA.examples.cross_validation import cross_validation_folds
 from ARIMA.examples.utils import load_data, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform, AffineTransform
@@ -165,16 +166,14 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     ####################################
     # Show predictions of missing data #
     ####################################
-    missing_ratios = np.linspace(0, 1, 5)
+    num_folds = 5
     missing_models = []
     missing_guides = []
     missing_samples = []
-    for missing_ratio in missing_ratios:
-        start_predict = np.floor(missing_ratio * (len(observations) - num_predictions))
-        obs_idx = [idx for idx in range(len(observations)) if idx < start_predict or idx >= start_predict + num_predictions]
-        missing_models.append(create_model(obs_idx, len(observations) - max(obs_idx) - 1, observations[obs_idx]))
-        conditioned_model = pyro.poutine.condition(missing_models[-1], data={'observations': observations[obs_idx]})
-        conditioned_predict = pyro.poutine.condition(missing_models[-1].predict, data={'observations': observations[obs_idx]})
+    for obs, train_idx, test_idx, start_idx in cross_validation_folds(observations, num_predictions, num_folds):
+        missing_models.append(create_model(train_idx, len(observations) - max(train_idx) - 1, obs[train_idx]))
+        conditioned_model = pyro.poutine.condition(missing_models[-1], data={'observations': obs[train_idx]})
+        conditioned_predict = pyro.poutine.condition(missing_models[-1].predict, data={'observations': obs[train_idx]})
         missing_guides.append(fit(conditioned_model))
         predictive = WeighedPredictive(conditioned_predict,
                                        guide=missing_guides[-1],
@@ -198,7 +197,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     # Plot predictions and actuals
     plt.figure()
     for n, (missing_model, missing_ci) in enumerate(zip(missing_models, missing_cis)):
-        plt.subplot(len(missing_ratios), 1, n+1)
+        plt.subplot(num_folds, 1, n+1)
         plt.fill_between(year[missing_model.predict_idx],
                          missing_ci[0], missing_ci[1], color='r', alpha=0.5)
         plt.plot(year, observations, 'b')
@@ -206,7 +205,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
         plt.ylabel('Value')
         if n == 0:
             plt.title('Predicting Arbitrary Missing Samples at 90% CI')
-        if n < (len(missing_ratios) - 1):
+        if n < (num_folds - 1):
             plt.gca().xaxis.set_tick_params(labelbottom=False)
     
     plt.xlabel('Year')
@@ -218,13 +217,13 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     # Plot mean confidence interval and observation probability versus missing samples location 
     plt.figure()
     plt.subplot(2, 1, 1)
-    plt.plot(100 * missing_ratios, missing_mean_cis, 'bo-')
+    plt.plot(100 * np.linspace(0, 1, num_folds), missing_mean_cis, 'bo-')
     plt.xlabel('Amount of Data Before First Missing Sample [%]')
     plt.ylabel('Mean 90% CI')
     plt.title('Bayesian Estimator 90% CI vs Missing Samples Location')
     plt.grid()
     plt.subplot(2, 1, 2)
-    plt.plot(100 * missing_ratios, missing_energy_score, 'ro-')
+    plt.plot(100 * np.linspace(0, 1, num_folds), missing_energy_score, 'ro-')
     plt.xlabel('Amount of Data Before First Missing Sample [%]')
     plt.ylabel('Per Sample Energy Score')
     plt.title('Missing Samples Energy Score vs Missing Samples Location')
