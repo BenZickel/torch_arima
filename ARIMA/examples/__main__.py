@@ -28,21 +28,20 @@ print('Saved output file ' + output_file_name)
 
 plt.figure()
 colors = ['r', 'g', 'b', 'y']
-for name, plot_spec, example in [('MLE', 'o-', ARIMA.examples.mle),
-                                 ('Bayesian', 'x-', ARIMA.examples.bayesian)]:
+for name, plot_spec, example in [('MLE', '--', ARIMA.examples.mle),
+                                 ('Bayesian', '-', ARIMA.examples.bayesian)]:
     spans = np.array(example.ratios) * (max(example.year) - min(example.year))
-    for plot_num, (span, median, color) in enumerate(zip(spans, example.median, colors)):
+    for plot_num, (span, median, color) in enumerate(zip(spans, example.moving_sum_median, colors)):
         plt.subplot(2, 2, plot_num + 1)
-        end_of_year_median = median[11::12]
-        plt.plot(range(1, len(end_of_year_median) + 1), end_of_year_median, color + plot_spec, label=name)
+        plt.plot(range(1, len(median) + 1), median / 12, color + plot_spec, label=name)
         plt.title('Span = {:.1f} Years'.format(span))
         if plot_num in [2, 3]:
-            plt.xlabel('Prediction Year')
+            plt.xlabel('Prediction Month')
         if plot_num in [0, 2]:
             plt.ylabel('Prediction Median')
         plt.legend(loc='upper right')
         plt.grid(True)
-plt.suptitle('Per Estimator Prediction Median')
+plt.suptitle('Per Estimator Previous Year Prediction Median')
 plt.tight_layout()
 
 output_file_name = plots_dir + '/compare_example_median.png'

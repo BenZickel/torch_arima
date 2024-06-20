@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import torch as pt
 import numpy as np
 from ARIMA import ARIMA
-from ARIMA.examples.utils import load_data, plots_dir, timeit
+from ARIMA.examples.utils import load_data, plots_dir, timeit, moving_sum
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform
 from pyro.ops.stats import quantile
@@ -103,14 +103,14 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     cis = []
     one_year_mean_ci = []
     five_year_mean_ci = []
-    median = []
+    moving_sum_median = []
     for span, idx, sample, color in zip(spans, indices, samples, colors):
         cis.append(quantile(sample, confidence_interval).detach().numpy())
         plt.fill_between(samples_year, cis[-1][0], cis[-1][1],
                          label='MLE Estimator at {:.1f} Years Observed Data Span at 90% CI'.format(span), color=color, alpha=0.5)
         one_year_mean_ci.append((cis[-1][1]-cis[-1][0])[:12].mean())
         five_year_mean_ci.append((cis[-1][1]-cis[-1][0]).mean())
-        median.append(quantile(sample, [0.5])[0].detach().numpy())
+        moving_sum_median.append(quantile(moving_sum(sample, 12, 1), [0.5])[0].detach().numpy())
     
     plt.xlabel('Year')
     plt.ylabel('Value')

@@ -13,7 +13,7 @@ from pyro.infer import WeighedPredictive, MHResampler
 from pyro.ops.stats import quantile, energy_score_empirical
 from ARIMA import BayesianARIMA
 from ARIMA.examples.cross_validation import cross_validation_folds
-from ARIMA.examples.utils import load_data, plots_dir, timeit
+from ARIMA.examples.utils import load_data, plots_dir, timeit, moving_sum
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform, AffineTransform
 
@@ -130,7 +130,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     cis = []
     one_year_mean_ci = []
     five_year_mean_ci = []
-    median = []
+    moving_sum_median = []
     for span, idx, model, sample, color in zip(spans, indices, models, samples, colors):
         cis.append(quantile(sample, confidence_interval))
         ci = cis[-1][..., model.predict_idx]
@@ -138,7 +138,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
                          label='Bayesian Estimator at {:.1f} Years Observed Data Span at 90% CI'.format(span), color=color, alpha=0.5)
         one_year_mean_ci.append((ci[1]-ci[0])[:12].mean())
         five_year_mean_ci.append((ci[1]-ci[0]).mean())
-        median.append(quantile(sample, [0.5])[0, model.predict_idx])
+        moving_sum_median.append(quantile(moving_sum(sample[..., model.predict_idx], 12, 1), [0.5])[0])
 
     plt.xlabel('Year')
     plt.ylabel('Value')
