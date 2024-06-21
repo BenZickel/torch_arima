@@ -12,7 +12,7 @@ import pyro
 from pyro.infer import WeighedPredictive, MHResampler
 from pyro.ops.stats import quantile, energy_score_empirical
 from ARIMA import BayesianARIMA
-from ARIMA.examples.cross_validation import cross_validation_folds
+from ARIMA.examples.cross_validation import cross_validation_folds, score_fold
 from ARIMA.examples.utils import load_data, plots_dir, timeit, moving_sum
 from ARIMA.examples import __name__ as __examples__name__
 from torch.distributions.transforms import ExpTransform, AffineTransform
@@ -166,39 +166,40 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     ####################################
     # Show predictions of missing data #
     ####################################
-    num_folds = 5
-    missing_models = []
-    missing_guides = []
-    missing_samples = []
-    for obs, train_idx, test_idx, start_idx in cross_validation_folds(observations, num_predictions, num_folds):
-        missing_models.append(create_model(train_idx, len(observations) - max(train_idx) - 1, obs[train_idx]))
-        conditioned_model = pyro.poutine.condition(missing_models[-1], data={'observations': obs[train_idx]})
-        conditioned_predict = pyro.poutine.condition(missing_models[-1].predict, data={'observations': obs[train_idx]})
-        missing_guides.append(fit(conditioned_model))
+    def posterior_predictive_sampler(obs, train_idx, test_idx, *args, **kwargs):
+        model = create_model(train_idx, max(max(test_idx) - max(train_idx), 0), obs[train_idx], *args, **kwargs)
+        conditioned_model = pyro.poutine.condition(model, data={'observations': obs[train_idx]})
+        conditioned_predict = pyro.poutine.condition(model.predict, data={'observations': obs[train_idx]})
+        guide = fit(conditioned_model)
         predictive = WeighedPredictive(conditioned_predict,
-                                       guide=missing_guides[-1],
+                                       guide=guide,
                                        num_samples=num_samples,
                                        parallel=True,
                                        return_sites=("_RETURN",))
         resampler = MHResampler(predictive)
         while resampler.get_total_transition_count() < num_samples:
-            sample = resampler(model_guide=conditioned_model).samples['_RETURN']
-        missing_samples.append(sample)
+            posterior_predictive_samples = resampler(model_guide=conditioned_model).samples['_RETURN']
+        return posterior_predictive_samples[..., test_idx]
+
+    num_folds = 5
+    missing_samples = []
+    missing_energy_score = []
+    missing_idx = []
+    for obs, train_idx, test_idx, start_idx in cross_validation_folds(observations, num_predictions, num_folds):
+        score, posterior_predictive_samples = score_fold(posterior_predictive_sampler, obs, train_idx, test_idx)
+        missing_samples.append(posterior_predictive_samples)
+        missing_energy_score.append(score / np.sqrt(len(test_idx)))
+        missing_idx.append(test_idx)
 
     # Calculate confidence intervals of predictions
-    missing_cis = [quantile(s[...,m.predict_idx], confidence_interval) for s, m in zip(missing_samples, missing_models)]
+    missing_cis = [quantile(s, confidence_interval) for s in missing_samples]
     missing_mean_cis = [(ci[1] - ci[0]).mean() for ci in missing_cis]
-
-    # Calculate the energy score of missing sample predictions
-    missing_energy_score = [energy_score_empirical(pred=s[...,m.predict_idx],
-                                                   truth=observations[m.predict_idx]) / np.sqrt(len(m.predict_idx))
-                                                                        for s, m in zip(missing_samples, missing_models)]
 
     # Plot predictions and actuals
     plt.figure()
-    for n, (missing_model, missing_ci) in enumerate(zip(missing_models, missing_cis)):
+    for n, missing_ci in enumerate(missing_cis):
         plt.subplot(num_folds, 1, n+1)
-        plt.fill_between(year[missing_model.predict_idx],
+        plt.fill_between(year[missing_idx[n]],
                          missing_ci[0], missing_ci[1], color='r', alpha=0.5)
         plt.plot(year, observations, 'b')
         plt.grid()

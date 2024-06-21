@@ -1,4 +1,7 @@
 
+from pyro.ops.stats import energy_score_empirical
+
+
 def cross_validation_folds(data, test_ratio_or_num, num_folds, train_ratio=1.0):
     '''
     Generate time series cross validation folds with a contigous range of test samples
@@ -45,6 +48,16 @@ def cross_validation_folds(data, test_ratio_or_num, num_folds, train_ratio=1.0):
         train_idx = [idx - start_idx for idx in train_idx]
         test_idx = [idx - start_idx for idx in test_idx]
         yield data[all_idx], train_idx, test_idx, start_idx
+
+
+def score_fold(posterior_predictive_sampler, obs, train_idx, test_idx, score_func=energy_score_empirical):
+    '''
+    Score cross-validation fold using the posterior predictive distribution.
+    '''
+    predictions = posterior_predictive_sampler(obs, train_idx, test_idx)
+    score = score_func(predictions, obs[test_idx])
+    return score, predictions
+
 
 if __name__ == "__main__":
     import doctest
