@@ -10,7 +10,13 @@ ARIMA = PyroModule[ARIMA]
 VARIMA = PyroModule[VARIMA]
 
 def BayesianARIMA(*args, obs_idx, predict_idx, innovations=NormalInnovations, **kwargs):
-    return BayesianTimeSeries(ARIMA(*args, **kwargs), innovations(), obs_idx, predict_idx)
+    module = BayesianTimeSeries(ARIMA(*args, **kwargs), innovations(), obs_idx, predict_idx)
+    if isinstance(module.model.i_tail, pt.nn.Parameter):
+        # Convert input tail parameter to the innovations distribution
+        tail_len = module.model.i_tail.shape[-1]
+        delattr(module.model, 'i_tail')
+        module.model.i_tail = PyroSample(lambda self: self.innovations_dist([*range(-tail_len, 0)]))
+    return module
 
 def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNormalInnovations, **kwargs):
     '''
