@@ -10,13 +10,16 @@ ARIMA = PyroModule[ARIMA]
 VARIMA = PyroModule[VARIMA]
 
 def BayesianARIMA(*args, obs_idx, predict_idx, innovations=NormalInnovations, **kwargs):
-    module = BayesianTimeSeries(ARIMA(*args, **kwargs), innovations(), obs_idx, predict_idx)
-    if isinstance(module.model.i_tail, pt.nn.Parameter):
+    model = ARIMA(*args, **kwargs)
+    innovations = innovations()
+    if isinstance(model.i_tail, pt.nn.Parameter):
         # Convert input tail parameter to the innovations distribution
-        tail_len = module.model.i_tail.shape[-1]
-        delattr(module.model, 'i_tail')
-        module.model.i_tail = PyroSample(lambda self: self.innovations_dist([*range(-tail_len, 0)]))
-    return module
+        tail_len = model.i_tail.shape[-1]
+        delattr(model, 'i_tail')
+        model.i_tail = PyroSample(lambda self: innovations([*range(-tail_len, 0)]))
+    # Create remaining model latent variables
+    make_params_pyro(model)
+    return BayesianTimeSeries(model, innovations, obs_idx, predict_idx)
 
 def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNormalInnovations, **kwargs):
     '''
@@ -32,14 +35,16 @@ def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNorma
         >>> ret_val.shape
         torch.Size([17, 5])
     '''
-    return BayesianTimeSeries(VARIMA([ARIMA(*args, **kwargs) for i in range(n)]), innovations(n), obs_idx, predict_idx)
+    model = VARIMA([ARIMA(*args, **kwargs) for i in range(n)])
+    innovations = innovations(n)
+    # Create remaining model latent variables
+    make_params_pyro(model)
+    return BayesianTimeSeries(model, innovations, obs_idx, predict_idx)
 
 class BayesianTimeSeries(PyroModule):
     def __init__(self, model, innovations, obs_idx, predict_idx):
         super().__init__()
         self.model = model
-        # Creating model latent variables
-        make_params_pyro(self)
         self.innovations_dist = innovations
         self.set_indices(obs_idx, predict_idx)
 
