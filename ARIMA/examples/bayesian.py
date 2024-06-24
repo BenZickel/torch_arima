@@ -70,6 +70,7 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     conditioned_predict = pyro.poutine.condition(model.predict, data={'observations': observations[model.obs_idx]})
     
     graph = render_model(conditioned_model, guide=create_guide(conditioned_model))
+    graph = graph.unflatten(stagger=4)
     graph.render(plots_dir + '/bayesian_model', view=False, cleanup=True, format='png')
 
     guide = fit(conditioned_model)
