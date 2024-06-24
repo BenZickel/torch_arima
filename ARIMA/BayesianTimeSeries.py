@@ -1,10 +1,9 @@
-import pyro
 import torch as pt
 from pyro.distributions import TransformedDistribution
 from pyro.nn import PyroSample, PyroModule, pyro_method
-from ARIMA.TimeSeries import ARIMA, VARIMA
-from ARIMA.pyro_utils import make_params_pyro
-from ARIMA.Innovations import NormalInnovations, MultivariateNormalInnovations
+from .TimeSeries import ARIMA, VARIMA
+from .pyro_utils import make_params_pyro
+from .Innovations import NormalInnovations, MultivariateNormalInnovations
 
 ARIMA = PyroModule[ARIMA]
 VARIMA = PyroModule[VARIMA]

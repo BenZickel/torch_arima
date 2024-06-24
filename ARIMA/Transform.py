@@ -1,6 +1,7 @@
 import torch as pt
 from torch.distributions.transforms import ComposeTransform
 from torch.distributions.constraints import independent, real
+from .torch_utils import jit_script
 
 def calc_arma_transform(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift):
     assert(x_is_in_not_out.shape==x.shape[-1:])
@@ -9,7 +10,7 @@ def calc_arma_transform(x, x_is_in_not_out, input, output, i_coefs, o_coefs, dri
     output = output[[None] * (len(x.shape) - len(output.shape)) + [Ellipsis]].expand(*(x.shape[:-1] + (output.shape[-1],)))
     return calc_arma_transform_core(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift)
 
-@pt.jit.script
+@jit_script
 def calc_arma_transform_core(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift):
     # Assume last coefficient is one
     i_coefs = i_coefs[..., :-1]

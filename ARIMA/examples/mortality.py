@@ -12,6 +12,7 @@ from ARIMA import BayesianVARIMA
 from ARIMA.Innovations import NormalInnovationsVector, MultivariateNormalInnovations
 from ARIMA.examples.utils import load_mortality_data, moving_sum, plots_dir, timeit
 from ARIMA.examples import __name__ as __examples__name__
+from ARIMA.pyro_utils import render_model
 
 def create_model(obs_idx, n, num_predictions, observations,
                  innovations=MultivariateNormalInnovations, model_args=(2, 0, 1, 0, 1, 1, 12)):
@@ -26,6 +27,13 @@ def create_model(obs_idx, n, num_predictions, observations,
                           obs_idx=obs_idx, predict_idx=predict_idx,
                           output_transforms=output_transforms, innovations=innovations)
 
+def create_guide(model):
+    # Create guide for Bayesian model
+    guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
+    guide()
+    guide.loc.data[:] = 0
+    return guide
+
 @timeit
 def fit(model,
         lr_sequence=[(0.005, 200),
@@ -34,10 +42,7 @@ def fit(model,
                      (0.001, 200)],
         loss=pyro.infer.JitTrace_ELBO,
         loss_params=dict(num_particles=20, vectorize_particles=True, ignore_jit_warnings=True)):
-    # Create posterior for Bayesian model
-    guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
-    guide()
-    guide.loc.data[:] = 0
+    guide = create_guide(model)
     loss = loss(**loss_params)
     for lr, num_iter in lr_sequence:
         optimizer = pyro.optim.Adam(dict(lr=lr))
@@ -62,6 +67,9 @@ if __name__ == "__main__" or __examples__name__ == "__main__":
     model = create_model(obs_idx, observations.shape[-1], num_predictions, observations)
     conditioned_model = pyro.poutine.condition(model, data={'observations': observations[model.obs_idx]})
     conditioned_predict = pyro.poutine.condition(model.predict, data={'observations': observations[model.obs_idx]})
+
+    graph = render_model(conditioned_model, guide=create_guide(conditioned_model))
+    graph.render(plots_dir + '/mortality_model', view=False, cleanup=True, format='png')
 
     guide = fit(conditioned_model)
 

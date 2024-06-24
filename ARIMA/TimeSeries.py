@@ -1,9 +1,8 @@
 import torch as pt
 import math
 from torch.distributions.transforms import ComposeTransform
-from ARIMA.taylor import taylor
-from ARIMA.Polynomial import BiasOnePolynomial, PD
-from ARIMA.Transform import ARMATransform
+from .Polynomial import BiasOnePolynomial, PD
+from .Transform import ARMATransform
 
 def calc_grads_hesss(coefs, grad_params, hess_params):
     grads = []

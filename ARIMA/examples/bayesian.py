@@ -15,6 +15,7 @@ from ARIMA import BayesianARIMA
 from ARIMA.examples.cross_validation import cross_validation_folds, score_fold
 from ARIMA.examples.utils import load_data, plots_dir, timeit, moving_sum
 from ARIMA.examples import __name__ as __examples__name__
+from ARIMA.pyro_utils import render_model
 from torch.distributions.transforms import ExpTransform, AffineTransform
 
 def create_model(obs_idx, num_predictions, observations,
@@ -30,6 +31,14 @@ def create_model(obs_idx, num_predictions, observations,
                          obs_idx=obs_idx, predict_idx=predict_idx,
                          output_transforms=output_transforms)
 
+def create_guide(model):
+    # Create guide for Bayesian model
+    guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
+    guide()
+    guide.loc.data[:] = 0
+    guide.scale_unconstrained.data[:] = -5
+    return guide
+
 @timeit
 def fit(model,
         lr_sequence=[(0.005, 100),
@@ -38,11 +47,7 @@ def fit(model,
                      (0.001, 100)],
         loss=pyro.infer.JitTrace_ELBO,
         loss_params=dict(num_particles=20, vectorize_particles=True, ignore_jit_warnings=True)):
-    # Create posterior for Bayesian model
-    guide = pyro.infer.autoguide.guides.AutoMultivariateNormal(model)
-    guide()
-    guide.loc.data[:] = 0
-    guide.scale_unconstrained.data[:] = -5
+    guide = create_guide(model)
     loss = loss(**loss_params)
     for lr, num_iter in lr_sequence:
         optimizer = pyro.optim.Adam(dict(lr=lr))
@@ -63,6 +68,9 @@ if __name__ == '__main__' or __examples__name__ == '__main__':
     model = create_model(obs_idx, num_predictions, observations)
     conditioned_model = pyro.poutine.condition(model, data={'observations': observations[model.obs_idx]})
     conditioned_predict = pyro.poutine.condition(model.predict, data={'observations': observations[model.obs_idx]})
+    
+    graph = render_model(conditioned_model, guide=create_guide(conditioned_model))
+    graph.render(plots_dir + '/bayesian_model', view=False, cleanup=True, format='png')
 
     guide = fit(conditioned_model)
 

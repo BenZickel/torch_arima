@@ -3,11 +3,11 @@ import pyro
 import dill
 from io import BytesIO
 from pyro import distributions, poutine
+import pyro.infer
+import pyro.infer.autoguide
 from pyro.nn import PyroSample, PyroParam, PyroModule
-from pyro.infer import Importance, Trace_ELBO
-from pyro.infer.importance import vectorized_importance_weights
-from typing import NamedTuple, Any
 from functools import partial
+from .torch_utils import enable_jit, disable_jit, _jit_enabled
 
 ModuleList = PyroModule[pt.nn.ModuleList]
 
@@ -102,6 +102,35 @@ class MixtureGuide(PyroModule):
                            infer={'enumerate': 'sequential', 'is_auxiliary': True})
         # Sample selected mixture component
         self.guide_list[idx](*args, **kwargs)
+
+def render_model(model,
+                 guide = None,
+                 model_args = tuple(),
+                 model_kwargs = dict(),
+                 render_distributions = True,
+                 render_params = True,
+                 render_deterministic = True):
+    if _jit_enabled:
+        jit_enabled = True
+        disable_jit()
+    else:
+        jit_enabled = False
+
+    if guide is not None:
+        guide_trace = poutine.trace(guide).get_trace()
+        model = poutine.replay(model, trace=guide_trace)
+
+    graph = pyro.render_model(model,
+                              model_args = model_args,
+                              model_kwargs = model_kwargs,
+                              render_distributions = render_distributions,
+                              render_params = render_params,
+                              render_deterministic = render_deterministic)
+
+    if jit_enabled:
+        enable_jit()
+    
+    return graph
 
 if __name__ == '__main__':
     import doctest
