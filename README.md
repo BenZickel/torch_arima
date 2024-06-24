@@ -64,7 +64,10 @@ python -m ARIMA.examples.bayesian
 ```
 
 <a name="bayesian_example"></a>
-The below graphs will be created.
+The Bayesian ARIMA model is described by the below directional graph.
+![](/ARIMA/examples/plots/bayesian_model.png)
+
+Additionally, the below graphs of the model outputs will be created.
 
 ![](/ARIMA/examples/plots/bayesian_example.png)
 <a name="bayesian_example_span"></a>
@@ -106,6 +109,9 @@ python -m ARIMA.examples.mortality
 ```
 
 <a name="mortality_example_monthly"></a>
+The Bayesian VARIMA model is described by the below directional graph.
+![](/ARIMA/examples/plots/mortality_model.png)
+
 The below graph shows predicted weekly death counts for males and females. The model captures annual periodic changes in mortality and correlations between female and male death counts.
 
 ![](/ARIMA/examples/plots/mortality_example_monthly.png)
