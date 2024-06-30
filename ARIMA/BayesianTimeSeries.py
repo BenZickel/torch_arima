@@ -36,6 +36,13 @@ def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNorma
     '''
     model = VARIMA([ARIMA(*args, **kwargs) for i in range(n)])
     innovations = innovations(n)
+    for n, arima in enumerate(model.arimas):
+        if isinstance(arima.i_tail, pt.nn.Parameter):
+            # Convert input tail parameter to the innovations distribution
+            tail_len = arima.i_tail.shape[-1]
+            delattr(arima, 'i_tail')
+            arima.i_tail = PyroSample(lambda self: model.i_tail[..., n])
+            model.i_tail = PyroSample(lambda self: innovations([*range(-tail_len, 0)]))
     # Create remaining model latent variables
     make_params_pyro(model)
     return BayesianTimeSeries(model, innovations, obs_idx, predict_idx)
