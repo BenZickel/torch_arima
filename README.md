@@ -23,6 +23,13 @@ pip install -e .
 python -m ARIMA
 ```
 
+## Tutorials
+
+Currently there is only one tutorial:
+- [Reconciling Experts](/ARIMA/tutorials/reconciling_experts.ipynb)
+
+Unfortunately, most of the basic stuff is covered in the examples found [here](/ARIMA/examples) and described below, which is not as convenient as walking through a tutorial.
+
 ## Examples
 
 All the examples can be run at once by executing
