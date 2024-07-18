@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='torch_arima',
-    version='0.0.3',
+    version='0.0.4',
     long_description=long_description,
     long_description_content_type="text/markdown",
     description='ARIMA time series implementation in PyTorch and Pyro',

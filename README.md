@@ -19,9 +19,13 @@ pip install -e .
 
 ## Tests
 
+Package tests can be executed by running
+
 ```
 python -m ARIMA
 ```
+
+Additional tests can be executed by running `pytest` within the directory where the package is installed.
 
 ## Tutorials
 
