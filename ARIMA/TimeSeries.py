@@ -122,15 +122,23 @@ class ARIMA(Transform, pt.nn.Module):
         # Transform observations to their value at the ARMA transfrom output
         if x_is_in_not_out is not None:
             x = x.clone()
-            x[..., ~x_is_in_not_out] = ComposeTransform(self.output_transforms).inv(x[..., ~x_is_in_not_out])
+            output_transforms = [transform
+                                 if isinstance(transform, pt.distributions.transforms.Transform) else
+                                 transform(~x_is_in_not_out) for transform in self.output_transforms]
+            x[..., ~x_is_in_not_out] = ComposeTransform(output_transforms).inv(x[..., ~x_is_in_not_out])
 
         # Set tails to correct length
         i_tail = replicate_to_length(self.i_tail, i_coefs.shape[-1] - 1)
         o_tail = replicate_to_length(self.o_tail, o_coefs.shape[-1] - 1)
         
+        # Setup output transform
+        output_transforms = [transform
+                             if isinstance(transform, pt.distributions.transforms.Transform) else
+                             transform(idx) for transform in self.output_transforms]
+        
         return ComposeTransform([ARMATransform(i_tail, o_tail,
                                                i_coefs, o_coefs, self.drift,
-                                               x, idx, x_is_in_not_out)] + self.output_transforms)
+                                               x, idx, x_is_in_not_out)] + output_transforms)
 
 class VARIMA(Transform, pt.nn.Module):
     '''
