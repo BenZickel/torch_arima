@@ -52,7 +52,7 @@ class BayesianTimeSeries(PyroModule):
         self.obs_idx = [*obs_idx]
         self.predict_idx = [*predict_idx]
         if set(self.obs_idx).union(set(self.predict_idx)) != \
-           set(range(len(self.obs_idx) + len(self.predict_idx))):
+           set(range(len(self))):
             raise UserWarning('Indices of observations and predictions must be complementary.')
         # Create innovations
         self.predict_innovations = PyroSample(lambda self: self.innovations_dist(self.predict_idx))
@@ -60,12 +60,14 @@ class BayesianTimeSeries(PyroModule):
         self.observations = PyroSample(lambda self: self.observations_dist())
         return self
 
+    def __len__(self):
+        return len(self.obs_idx) + len(self.predict_idx)
+
     def innovations(self):
         # Build innovations vector
-        innovations = self.predict_innovations.new_empty(
-            self.innovations_dist.shape(len(self.obs_idx) + len(self.predict_idx))).fill_(pt.nan)
+        innovations = self.predict_innovations.new_empty(self.innovations_dist.shape(len(self))).fill_(pt.nan)
         innovations[self.innovations_dist.slice(self.predict_idx)] = self.predict_innovations
-        is_innovation = pt.zeros(len(self.obs_idx) + len(self.predict_idx), dtype=pt.bool)
+        is_innovation = pt.zeros(len(self), dtype=pt.bool)
         is_innovation[self.predict_idx] = True
         return innovations, is_innovation
 
