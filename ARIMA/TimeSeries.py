@@ -140,7 +140,16 @@ class ARIMA(Transform, pt.nn.Module):
                                                i_coefs, o_coefs, self.drift,
                                                x, idx, x_is_in_not_out)] + output_transforms)
 
-class VARIMA(Transform, pt.nn.Module):
+class VARIMATransform(Transform):
+    def get_transform(self, x=None, idx=None, x_is_in_not_out=None):
+        if x is None:
+            x_vec = [None] * len(self.arimas)
+        else:
+            x_vec = [x[..., idx] for idx in range(x.shape[-1])]
+        return pt.distributions.transforms.StackTransform([arima.get_transform(x_value, idx, x_is_in_not_out)
+                                                                                for x_value, arima in zip(x_vec, self.arimas)], dim=-1)
+
+class VARIMA(VARIMATransform, pt.nn.Module):
     '''
     Vector ARIMA time series implementation in PyTorch.
 
@@ -162,14 +171,6 @@ class VARIMA(Transform, pt.nn.Module):
     def __init__(self, arimas):
         super().__init__()
         self.arimas = pt.nn.ModuleList(arimas)
-        
-    def get_transform(self, x=None, idx=None, x_is_in_not_out=None):
-        if x is None:
-            x_vec = [None] * len(self.arimas)
-        else:
-            x_vec = [x[..., idx] for idx in range(x.shape[-1])]
-        return pt.distributions.transforms.StackTransform([arima.get_transform(x_value, idx, x_is_in_not_out)
-                                                                                for x_value, arima in zip(x_vec, self.arimas)], dim=-1)
 
 if __name__ == "__main__":
     import doctest

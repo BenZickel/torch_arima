@@ -1,12 +1,15 @@
 import torch as pt
 from pyro.distributions import TransformedDistribution
-from pyro.nn import PyroSample, PyroModule, pyro_method
-from .TimeSeries import ARIMA, VARIMA
+from pyro.nn import PyroSample, PyroModule, PyroModuleList, pyro_method
+from . import TimeSeries
 from .pyro_utils import make_params_pyro
 from .Innovations import NormalInnovations, MultivariateNormalInnovations
 
-ARIMA = PyroModule[ARIMA]
-VARIMA = PyroModule[VARIMA]
+ARIMA = PyroModule[TimeSeries.ARIMA]
+class VARIMA(TimeSeries.VARIMATransform, PyroModule):
+    def __init__(self, arimas):
+        super().__init__()
+        self.arimas = PyroModuleList(arimas)
 
 def BayesianARIMA(*args, obs_idx, predict_idx, innovations=NormalInnovations, **kwargs):
     model = ARIMA(*args, **kwargs)
