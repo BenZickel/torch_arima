@@ -1,7 +1,7 @@
 # Background
 
 We would like to model experts that have time dependent opinions that must converge to the same value at some ultimate time $T$.
-The toy model we will use is based on each expert being a random walk.
+The toy model we will use is based on each expert being a random walk. An implementation of this toy model using the Pyro probablistic programming language can be found [here](reconciling_experts.ipynb).
 
 # Toy Model
 
