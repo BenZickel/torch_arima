@@ -2,7 +2,7 @@
 import setuptools, subprocess
 
 # Baseline version identifier
-version='0.0.6'
+version='0.0.7'
 
 # Try to add commit hash to version
 try:

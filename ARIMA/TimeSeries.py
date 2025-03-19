@@ -85,7 +85,17 @@ class ARIMA(Transform, pt.nn.Module):
         self.PDS = PD(ps, ds, s)
         self.QS = BiasOnePolynomial(qs, s)
         self.output_transforms = output_transforms
-        
+        self.drift = pt.nn.Parameter(pt.zeros(1)) if drift else pt.zeros(1)
+        self.calculate_fixed_coefs()
+        self.i_tail = get_tail(i_tail_type, s, self.i_coefs)
+        self.o_tail = get_tail(o_tail_type, s, self.o_coefs)
+
+    def double(self):
+        super().double()
+        self.calculate_fixed_coefs()
+        return self
+
+    def calculate_fixed_coefs(self):
         # Calculate coefficients factors of observables
         o_coefs = list((self.PD * self.PDS).get_coefs())[::-1]
         o_grad_params = self.PD.get_params() + self.PDS.get_params()
@@ -97,10 +107,6 @@ class ARIMA(Transform, pt.nn.Module):
         i_grad_params = self.Q.get_params() + self.QS.get_params()
         self.i_grads, self.i_hesss = calc_grads_hesss(i_coefs, i_grad_params, i_grad_params[1:])
         self.i_coefs = pt.cat([i_coef[None] for i_coef in i_coefs]).detach().clone()
-        
-        self.drift = pt.nn.Parameter(pt.zeros(1)) if drift else pt.zeros(1)
-        self.i_tail = get_tail(i_tail_type, s, self.i_coefs)
-        self.o_tail = get_tail(o_tail_type, s, self.o_coefs)
         
     def get_transform(self, x=None, idx=None, x_is_in_not_out=None):
         # Calculate coefficients of observations

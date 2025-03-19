@@ -11,8 +11,10 @@ class VARIMA(TimeSeries.VARIMATransform, PyroModule):
         super().__init__()
         self.arimas = PyroModuleList(arimas)
 
-def BayesianARIMA(*args, obs_idx, predict_idx, innovations=NormalInnovations, **kwargs):
+def BayesianARIMA(*args, obs_idx, predict_idx, innovations=NormalInnovations, double=False, **kwargs):
     model = ARIMA(*args, **kwargs)
+    if double:
+        model.double()
     innovations = innovations()
     if isinstance(model.i_tail, pt.nn.Parameter):
         # Convert input tail parameter to the innovations distribution
@@ -23,7 +25,7 @@ def BayesianARIMA(*args, obs_idx, predict_idx, innovations=NormalInnovations, **
     make_params_pyro(model)
     return BayesianTimeSeries(model, innovations, obs_idx, predict_idx)
 
-def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNormalInnovations, **kwargs):
+def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNormalInnovations, double=False, **kwargs):
     '''
     Examples:
         >>> from ARIMA import BayesianVARIMA
@@ -38,6 +40,8 @@ def BayesianVARIMA(*args, n, obs_idx, predict_idx, innovations=MultivariateNorma
         torch.Size([17, 5])
     '''
     model = VARIMA([ARIMA(*args, **kwargs) for i in range(n)])
+    if double:
+        model.double()
     innovations = innovations(n)
     # Create remaining model latent variables
     make_params_pyro(model)
