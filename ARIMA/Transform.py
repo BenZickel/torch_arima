@@ -6,8 +6,8 @@ from .torch_utils import jit_script
 def calc_arma_transform(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift):
     assert(x_is_in_not_out.shape==x.shape[-1:])
     # Match dimensions
-    input = input[[None] * (len(x.shape) - len(input.shape)) + [Ellipsis]].expand(*(x.shape[:-1] + (input.shape[-1],)))
-    output = output[[None] * (len(x.shape) - len(output.shape)) + [Ellipsis]].expand(*(x.shape[:-1] + (output.shape[-1],)))
+    input = input[tuple([None] * (len(x.shape) - len(input.shape)) + [Ellipsis])].expand(*(x.shape[:-1] + (input.shape[-1],)))
+    output = output[tuple([None] * (len(x.shape) - len(output.shape)) + [Ellipsis])].expand(*(x.shape[:-1] + (output.shape[-1],)))
     return calc_arma_transform_core(x, x_is_in_not_out, input, output, i_coefs, o_coefs, drift)
 
 @jit_script
